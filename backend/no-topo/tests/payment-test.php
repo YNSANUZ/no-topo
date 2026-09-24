@@ -38,6 +38,7 @@ $result = no_topo_process_payment($request, $gateway);
 pay_same('approved', $result['provider']['status'], 'approved provider response');
 pay_same($reservation['id'], $result['provider']['external_reference'], 'reservation is external reference');
 pay_same(20, $result['provider']['transaction_amount'], 'server amount is sent');
+pay_same('https://primusdf.com.br/_no_topo_backend/api/mercadopago-webhook.php', no_topo_payment_payload($reservation, $request['formData'])['notification_url'], 'payment registers isolated webhook');
 pay_same($result, no_topo_process_payment($request, $gateway), 'idempotent replay');
 
 $tampered = $request;

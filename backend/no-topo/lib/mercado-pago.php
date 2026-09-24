@@ -21,6 +21,7 @@ function no_topo_payment_payload(array $reservation, array $form): array
         'installments' => max(1, (int) ($form['installments'] ?? 1)),
         'payment_method_id' => $method,
         'external_reference' => $reservation['id'],
+        'notification_url' => 'https://primusdf.com.br/_no_topo_backend/api/mercadopago-webhook.php',
         'payer' => ['email' => $email],
     ];
     if (!empty($form['issuer_id'])) {
