@@ -11,7 +11,8 @@ import { featuredPost, instagramEmbedUrl } from "../lib/featured-post.mjs";
 
 const LIME = 0xb9ff38;
 const NAVY = 0x19305f;
-const modelPaths = ["a", "c", "f", "j", "n", "r"].map((id) => `/models/kenney/character-${id}.glb`);
+const siteBasePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+const modelPaths = ["a", "c", "f", "j", "n", "r"].map((id) => `${siteBasePath}/models/kenney/character-${id}.glb`);
 
 function textTexture(lines: string[], accent = "#b9ff38") {
   const canvas = document.createElement("canvas");
