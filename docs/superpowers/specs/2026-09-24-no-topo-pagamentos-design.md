@@ -74,6 +74,54 @@ O modal atual deixa de dizer “simulação” e passa a mostrar:
 
 Durante a proteção de dez minutos, os botões de compra ficam desabilitados e mostram quando novos lances serão liberados. O chat e a navegação 3D continuam funcionando.
 
+## Placa explicativa
+
+Uma placa iluminada próxima à entrada do coliseu explica a mecânica sem competir visualmente com o telão. Ela mostra os cinco pontos essenciais: superar o lance atual, aprovação do pagamento, proteção de dez minutos, possibilidade de ser ultrapassado depois da proteção e reset diário para R$ 20,00. A última linha usa os valores recebidos da API para exibir lance atual e próximo mínimo.
+
+No celular, tocar na placa abre um painel HTML legível com o mesmo conteúdo. A placa 3D não recebe texto financeiro estático: valores vêm sempre do estado confirmado pelo servidor.
+
+## Anúncio por voz
+
+O navegador usa `speechSynthesis` para anunciar “O primeiro lugar é” seguido do apelido público. Um visitante ouve o anúncio de entrada uma única vez por sessão. A chave gravada em `sessionStorage` inclui o ciclo e o identificador do vencedor, mas mudanças posteriores não repetem o anúncio de entrada.
+
+Quando um novo pagamento é aprovado enquanto o visitante está na sala, ocorre um anúncio de conquista separado: “Novo primeiro lugar. O primeiro lugar é” seguido do apelido. Cada evento aprovado é anunciado uma única vez por aparelho. Se o navegador bloquear áudio automático, o anúncio fica pendente até a primeira interação. Um controle persistente permite silenciar voz e efeitos sonoros.
+
+## Comemoração coletiva
+
+Uma nova conquista dispara uma sequência de aproximadamente oito segundos:
+
+1. anúncio do novo primeiro lugar;
+2. câmera cinematográfica temporária sem retirar o controle definitivamente do visitante;
+3. NPCs levantam os dois braços e executam saltos leves;
+4. aplausos e ovacionamento curtos;
+5. luzes verdes e roxas percorrem a arena;
+6. fogos de artifício leves aparecem no fundo escuro;
+7. o novo conteúdo e o ranking atualizado permanecem no telão.
+
+O identificador do lance aprovado impede repetição e spam. A animação reutiliza os esqueletos e materiais existentes, usa partículas agrupadas sem física e respeita `prefers-reduced-motion`. Nesse modo, a conquista usa apenas mudança de luz suave e mensagem estática, sem saltos ou flashes. Sons dependem de interação prévia e obedecem ao controle de silêncio.
+
+## Hall da Fama
+
+Uma placa clicável chamada “HALL DA FAMA” dentro do cenário abre `https://nexo.yt/ranking` em outra aba. A home mostra apenas uma prévia dos três maiores tempos acumulados. A página separada contém a lista pública completa e três ordenações:
+
+- **Mais tempo:** classificação principal pelo tempo acumulado como primeiro lugar;
+- **Maiores lances:** maior valor aprovado por participante;
+- **Recentes:** conquistas aprovadas da mais nova para a mais antiga.
+
+Cada entrada pública contém posição, apelido, link ou miniatura permitida da publicação, tempo acumulado no telão, quantidade de conquistas, maior lance e última aparição. E-mail, CPF, forma de pagamento, identificadores financeiros e detalhes de transação nunca aparecem.
+
+O tempo contabilizado de uma conquista começa na aprovação e termina quando outro vencedor assume ou quando o ciclo é encerrado à meia-noite. A API calcula esse tempo no servidor, incluindo o intervalo ainda em andamento do primeiro lugar atual. Apelidos iguais não são fundidos sem uma identidade pública estável; na primeira versão, cada e-mail normalizado recebe um identificador público irreversível produzido por HMAC no servidor.
+
+## Vídeo compartilhável da conquista
+
+O aparelho do comprador grava uma repetição cinematográfica de aproximadamente dez segundos quando recebe a confirmação de que seu lance foi aprovado. A repetição usa o canvas WebGL da arena, câmera predeterminada, apelido, valor, marca `nexo.yt`, animação dos NPCs, aplausos e fogos. Somente o aparelho associado à reserva vencedora gera o arquivo; os demais visitantes apenas assistem à comemoração ao vivo.
+
+O iframe do Instagram não pode ser capturado por restrições de origem. Durante a gravação, o telão usa uma composição própria com apelido, posição, capa pública quando disponível e link da publicação. O Reel não é copiado, baixado nem redistribuído.
+
+O gravador usa `canvas.captureStream()` e `MediaRecorder`, combinando áudio por `MediaStreamAudioDestinationNode`. Seleciona `video/mp4` somente quando `MediaRecorder.isTypeSupported()` confirmar suporte; caso contrário, gera `video/webm`. A interface oferece “Compartilhar minha conquista” pela Web Share API quando arquivos forem aceitos e, como alternativa, download local e cópia do link do ranking.
+
+Nenhum vídeo é enviado ao servidor na primeira versão. Isso elimina custo de armazenamento e conversão, não cria uma biblioteca pública sem consentimento e mantém o processamento no aparelho. Em dispositivos lentos, modo de economia reduz resolução, quantidade de partículas e taxa de quadros; falha de gravação nunca afeta o pagamento ou a promoção do ranking.
+
 ## Segurança e moderação
 
 - Access Token, segredo do webhook, registros integrais de pagamentos e dados pessoais nunca chegam ao GitHub.
@@ -83,6 +131,8 @@ Durante a proteção de dez minutos, os botões de compra ficam desabilitados e 
 - Apelido e URL passam por validação e moderação antes da cobrança.
 - E-mail é usado apenas para identificar o comprador e prestar suporte; não aparece no ranking.
 - Um mecanismo administrativo poderá ocultar uma publicação sem apagar o pagamento ou o histórico de auditoria.
+- A gravação compartilhável não contém e-mail, CPF, dados de pagamento, mensagens do chat nem apelidos de visitantes do público.
+- Apelidos visíveis de NPCs e usuários secundários são omitidos durante a gravação; somente o vencedor autorizado aparece em destaque.
 
 ## Testes e implantação
 
@@ -92,6 +142,9 @@ Durante a proteção de dez minutos, os botões de compra ficam desabilitados e 
 - Antes de publicar PHP, serão criados backup datado e hashes dos arquivos compartilhados do Ursoninhos.
 - O frontend só será publicado após a API responder corretamente às origens do No Topo.
 - O rollback remove a chamada ao checkout do frontend e restaura os arquivos PHP pelo backup, sem alterar pedidos do Ursoninhos.
+- Testes de interface cobrem anúncio único por sessão, evento único por conquista, silêncio, redução de movimento, abertura segura do Hall da Fama e fallback MP4/WebM.
+- Testes do ranking cobrem encerramento do tempo ao ser ultrapassado, corte à meia-noite, agregação por identificador público e ausência de dados privados.
+- A captura será testada em Chrome desktop e Android; navegadores sem `captureStream`, `MediaRecorder` ou compartilhamento de arquivos recebem apenas o botão de copiar link.
 
 ## Fora do primeiro lançamento
 
@@ -99,3 +152,4 @@ Durante a proteção de dez minutos, os botões de compra ficam desabilitados e 
 - Carteira de créditos, cupons ou reembolso automático por tempo de exposição.
 - Aplicativo móvel nativo.
 - Suporte a redes sociais além do Instagram.
+- Conversão centralizada obrigatória para MP4, armazenamento dos vídeos e galeria pública de conquistas.
