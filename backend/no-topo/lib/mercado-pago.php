@@ -98,9 +98,15 @@ function no_topo_validate_webhook_signature(string $signature, string $requestId
     return hash_equals(hash_hmac('sha256', $manifest, $secret), $parts['v1']);
 }
 
+function no_topo_shared_config_path(): string
+{
+    // In production both isolated backends are siblings inside public_html.
+    return dirname(__DIR__, 2) . '/_ursoninhos_backend/config/mercadopago.php';
+}
+
 function no_topo_load_mercado_pago_config(): array
 {
-    $shared = dirname(__DIR__, 3) . '/_ursoninhos_backend/config/mercadopago.php';
+    $shared = no_topo_shared_config_path();
     if (!is_file($shared)) {
         throw new RuntimeException('Configuracao do Mercado Pago indisponivel.');
     }

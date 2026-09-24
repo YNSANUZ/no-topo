@@ -17,6 +17,8 @@ function pay_throws(callable $callback, string $part): void
     throw new RuntimeException("FAIL expected {$part}");
 }
 
+pay_same(dirname(__DIR__, 2) . '/_ursoninhos_backend/config/mercadopago.php', no_topo_shared_config_path(), 'shared config remains a sibling backend');
+
 $now = new DateTimeImmutable('2026-09-24 12:00:00', new DateTimeZone('America/Sao_Paulo'));
 $reserved = no_topo_reserve(no_topo_empty_state($now), [
     'nickname' => 'Visitante 482', 'email' => 'pessoa@example.com',
