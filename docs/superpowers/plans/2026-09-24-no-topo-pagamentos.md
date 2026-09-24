@@ -20,6 +20,9 @@
 - Never commit the Access Token, webhook secret, buyer CPF, payment token, or complete payment payload.
 - Never modify or overwrite Ursoninhos orders, users, products, or `data/orders.json`.
 - Production PHP is backed up and hashed before upload; deployment remains reversible.
+- Entry speech plays at most once per browser session and conquest effects play at most once per approved bid ID per device.
+- Celebration respects `prefers-reduced-motion` and every sound obeys a persistent mute control.
+- Share video stays on the winner's device; no recording is uploaded in the first release.
 
 ## Review Focus
 
@@ -28,6 +31,7 @@
 - The same webhook or payment request is delivered more than once: ranking and charging remain idempotent.
 - A valid-looking Instagram URL contains credentials, a foreign hostname, or an encoded path trick: reject it before creating a reservation.
 - The frontend cannot reach the API or Instagram refuses the embed: preserve the current screen and show a recoverable error.
+- MediaRecorder lacks MP4 support or fails mid-capture: offer WebM or link sharing without affecting the approved bid.
 
 ---
 
@@ -308,14 +312,13 @@ git commit -m "feat: add No Topo checkout client"
 - Modify: `app/page.tsx`
 - Modify: `app/layout.tsx`
 - Modify: `app/globals.css`
-- Modify: `components/arena-3d.tsx`
 - Modify: `lib/featured-post.mjs`
 - Modify: `lib/featured-post.d.ts`
 - Create: `lib/live-arena.test.mjs`
 
 **Interfaces:**
 - Consumes: Task 4 client and reducer, Mercado Pago Public Key `APP_USR-68053913-290d-4ec4-9333-62b33a49f099` (public credential), and public arena state.
-- Produces: real bid form, live podium values, protected-state UI, payment result UI, and polling every 10 seconds while the page is visible.
+- Produces: real bid form, live podium state, protected-state UI, payment result UI, and polling every 10 seconds while the page is visible.
 
 - [ ] **Step 1: Write failing live-arena tests**
 
@@ -344,7 +347,7 @@ Expected: FAIL because the state-to-view adapter is absent.
 
 - [ ] **Step 3: Implement the dialog and live arena state**
 
-Load the Mercado Pago SDK once in `app/layout.tsx`, mount/unmount the Payment Brick only after the server creates a reservation, and pass the Brick submission to `process-bid-payment.php`. Replace “Protótipo seguro” and “SIMULAR” copy with the approved transaction wording. Poll public state every ten seconds and immediately after approval. Pass live rank data into `Arena`; regenerate only the affected canvas textures rather than rebuilding the whole Three.js scene.
+Load the Mercado Pago SDK once in `app/layout.tsx`, mount/unmount the Payment Brick only after the server creates a reservation, and pass the Brick submission to `process-bid-payment.php`. Replace “Protótipo seguro” and “SIMULAR” copy with the approved transaction wording. Poll public state every ten seconds and immediately after approval. Preserve the last known good state when polling fails.
 
 - [ ] **Step 4: Verify tests, lint, and static export**
 
@@ -361,7 +364,177 @@ git commit -m "feat: enable real bids in No Topo UI"
 
 ---
 
-### Task 6: Backup, deploy, and verify without charging a customer
+### Task 6: Hall da Fama data and ranking page
+
+**Files:**
+- Modify: `backend/no-topo/lib/arena.php`
+- Create: `backend/no-topo/api/ranking.php`
+- Modify: `backend/no-topo/tests/arena-test.php`
+- Create: `app/ranking/page.tsx`
+- Create: `components/ranking-board.tsx`
+- Create: `lib/ranking.mjs`
+- Create: `lib/ranking.test.mjs`
+- Modify: `app/globals.css`
+
+**Interfaces:**
+- Consumes: approved bids and cycle boundaries from Tasks 1–3.
+- Produces: `GET /_no_topo_backend/api/ranking.php?sort=time|bid|recent`, `no_topo_public_participant_id(string $email, string $secret): string`, `rankingRows(array $bids, DateTimeImmutable $now): array`, and `/ranking`.
+
+- [ ] **Step 1: Write failing backend and frontend ranking tests**
+
+Add PHP assertions proving that a winner's duration stops at the next approval or cycle end, the active winner accrues time up to `now`, repeat wins aggregate by HMAC public participant ID, and public rows omit email/provider fields. Add Node assertions for all three sort modes and duration formatting:
+
+```js
+test('sorts the Hall da Fama by accumulated screen time', () => {
+  const rows = sortRanking([
+    { publicId: 'a', totalSeconds: 120, maxBidCents: 8000, lastWonAt: '2026-09-24T10:00:00Z' },
+    { publicId: 'b', totalSeconds: 600, maxBidCents: 4000, lastWonAt: '2026-09-24T09:00:00Z' },
+  ], 'time');
+  assert.equal(rows[0].publicId, 'b');
+  assert.equal(formatDuration(600), '10min');
+});
+```
+
+- [ ] **Step 2: Run tests and verify RED**
+
+Run: `php backend/no-topo/tests/arena-test.php && node --test lib/ranking.test.mjs`
+
+Expected: FAIL because ranking aggregation and frontend helpers are absent.
+
+- [ ] **Step 3: Implement ranking aggregation, endpoint, and page**
+
+Use `hash_hmac('sha256', strtolower(trim($email)), $privateSecret)` and expose only the first 20 hex characters as `publicId`. Return position, nickname, post URL/shortcode, total seconds, win count, maximum approved bid, and last win. Build `/ranking` with tabs “Mais tempo”, “Maiores lances”, and “Recentes”; fetch public data without authentication and render an error/retry state without exposing raw server messages.
+
+- [ ] **Step 4: Run PHP, Node, lint, and build gates**
+
+Run: `php backend/no-topo/tests/arena-test.php && node --test lib/ranking.test.mjs && npm test && npm run lint && npm run build`
+
+Expected: all assertions pass, lint is clean, and static export contains `ranking/index.html`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add backend/no-topo app/ranking components/ranking-board.tsx lib/ranking.mjs lib/ranking.test.mjs app/globals.css
+git commit -m "feat: add No Topo Hall da Fama"
+```
+
+---
+
+### Task 7: In-scene explanation, Hall da Fama plaque, and voice announcements
+
+**Files:**
+- Modify: `components/arena-3d.tsx`
+- Create: `components/how-it-works-dialog.tsx`
+- Create: `hooks/use-arena-announcer.ts`
+- Create: `lib/arena-announcer.mjs`
+- Create: `lib/arena-announcer.test.mjs`
+- Modify: `app/page.tsx`
+- Modify: `app/globals.css`
+
+**Interfaces:**
+- Consumes: live arena state and ranking preview.
+- Produces: clickable “COMO FUNCIONA” and “HALL DA FAMA” meshes, accessible HTML dialog, `announcementForEntry(state, session)`, and mute control.
+
+- [ ] **Step 1: Write failing announcer tests**
+
+Cover one entry announcement per session, no repeat after polling, a pending announcement before user interaction, mute suppression, sanitized pronunciation, and a separate one-time conquest announcement keyed by approved bid ID:
+
+```js
+test('announces one conquest once per device', () => {
+  const first = nextConquestAnnouncement({ bidId: 'bid-7', nickname: '@ana' }, new Set(), false);
+  assert.equal(first.text, 'Novo primeiro lugar. O primeiro lugar é ana.');
+  assert.equal(nextConquestAnnouncement({ bidId: 'bid-7', nickname: '@ana' }, new Set(['bid-7']), false), null);
+});
+```
+
+- [ ] **Step 2: Run and verify RED**
+
+Run: `node --test lib/arena-announcer.test.mjs`
+
+Expected: FAIL because announcer functions are absent.
+
+- [ ] **Step 3: Implement plaques, dialog, speech, and mute**
+
+Render the five approved rules and live bid values on the explanation plaque texture. Use Three.js raycasting to open the HTML dialog and `window.open('/ranking', '_blank', 'noopener,noreferrer')` for Hall da Fama. In the hook, queue `SpeechSynthesisUtterance` until the first pointer/keyboard interaction, select a `pt-BR` voice when available, store entry/conquest keys in `sessionStorage`, and store mute preference in `localStorage`.
+
+- [ ] **Step 4: Run tests, lint, and build**
+
+Run: `npm test && npm run lint && npm run build`
+
+Expected: all tests pass, both plaques are keyboard-accessible through equivalent HTML controls, and build succeeds.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add components hooks lib app
+git commit -m "feat: explain and announce No Topo winners"
+```
+
+---
+
+### Task 8: Celebration sequence and local share recording
+
+**Files:**
+- Modify: `components/arena-3d.tsx`
+- Create: `lib/celebration.mjs`
+- Create: `lib/celebration.test.mjs`
+- Create: `hooks/use-conquest-recorder.ts`
+- Create: `lib/conquest-recorder.mjs`
+- Create: `lib/conquest-recorder.test.mjs`
+- Create: `components/conquest-share.tsx`
+- Modify: `app/page.tsx`
+- Modify: `app/globals.css`
+
+**Interfaces:**
+- Consumes: newly approved bid ID, winner nickname, amount, WebGL canvas, audio bus, mute setting, and reduced-motion preference.
+- Produces: deterministic eight-second celebration timeline, ten-second cinematic replay, MP4/WebM `Blob`, Web Share action, download fallback, and copied ranking link.
+
+- [ ] **Step 1: Write failing celebration and recorder tests**
+
+Test timeline boundaries, deduplication, reduced-motion behavior, MIME selection, failure fallback, and absence of private/chat data:
+
+```js
+test('prefers MP4 and falls back to WebM', () => {
+  assert.equal(selectRecordingMime(type => type === 'video/mp4'), 'video/mp4');
+  assert.equal(selectRecordingMime(type => type === 'video/webm;codecs=vp9,opus'), 'video/webm;codecs=vp9,opus');
+});
+
+test('reduced motion removes jumps and fireworks', () => {
+  const timeline = celebrationTimeline({ reducedMotion: true });
+  assert.equal(timeline.some(event => event.type === 'jump' || event.type === 'firework'), false);
+});
+```
+
+- [ ] **Step 2: Run and verify RED**
+
+Run: `node --test lib/celebration.test.mjs lib/conquest-recorder.test.mjs`
+
+Expected: FAIL because celebration and recorder modules are absent.
+
+- [ ] **Step 3: Implement the lightweight celebration**
+
+Add one reusable celebration state to the existing animation loop. Drive NPC root height and both arm rotations from the timeline; do not create one animation loop per NPC. Use a pooled `THREE.Points` particle buffer for fireworks, cap particles by device tier, animate existing arena lights, and restore the visitor's camera after the cinematic sequence. Skip jumps/fireworks under reduced motion.
+
+- [ ] **Step 4: Implement local recording and sharing**
+
+Create a same-origin celebration screen texture containing only winner nickname, approved amount, position, permitted cover, and `nexo.yt`. Capture the WebGL canvas with `captureStream()`; connect applause/ovation through one `AudioContext` destination; choose MP4 only when supported and otherwise VP9/VP8 WebM. Stop tracks and revoke object URLs after use. Use `navigator.canShare({ files: [file] })` before invoking native sharing; otherwise expose download and copy `https://nexo.yt/ranking`.
+
+- [ ] **Step 5: Run the complete frontend gate**
+
+Run: `npm test && npm run lint && npm run build`
+
+Expected: all tests pass and build succeeds without bundling server credentials or external video encoders.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add components hooks lib app
+git commit -m "feat: celebrate and share No Topo conquests"
+```
+
+---
+
+### Task 9: Backup, deploy, and verify without charging a customer
 
 **Files:**
 - Create locally during deployment: `backups/no-topo-payments-YYYYMMDD-HHMMSS/manifest.sha256`
@@ -402,7 +575,11 @@ Configure the existing Mercado Pago application to notify `https://primusdf.com.
 
 Compare uploaded public PHP hashes with prepared artifacts. Record changed files, preserved data, tests, public URLs, and rollback steps: restore the dated backup only if a shared file changed, remove/disable `_no_topo_backend`, and revert the frontend to the last known-good commit. Never delete payment audit records during rollback.
 
-- [ ] **Step 8: Commit deployment documentation**
+- [ ] **Step 8: Verify ranking and media fallbacks**
+
+Confirm `/ranking` sorts all three views correctly, the entry announcement occurs once, a synthetic non-financial conquest event triggers one celebration, reduced-motion removes jumps/fireworks, mute blocks audio, MP4/WebM selection follows browser support, and a recording failure leaves link sharing available.
+
+- [ ] **Step 9: Commit deployment documentation**
 
 ```bash
 git add docs
