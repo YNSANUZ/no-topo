@@ -7,7 +7,8 @@ import { CSS3DObject, CSS3DRenderer } from "three/examples/jsm/renderers/CSS3DRe
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { advanceToward, clampArenaTarget, createPerimeterLights, createSeatLayout, entranceLayout, getCameraView, getNpcMotion, getSeatedCharacterRotation } from "../lib/arena-layout.mjs";
-import { featuredPost, instagramEmbedUrl } from "../lib/featured-post.mjs";
+import { instagramEmbedUrl } from "../lib/featured-post.mjs";
+import type { ArenaFeatured } from "../lib/live-arena.mjs";
 
 const LIME = 0xb9ff38;
 const NAVY = 0x19305f;
@@ -60,27 +61,28 @@ function makeLabel(text: string) {
   sprite.scale.set(2.7, .62, 1); return sprite;
 }
 
-function makeInstagramScreen(countdown: string) {
+function makeInstagramScreen(countdown: string, featured: ArenaFeatured) {
   const panel = document.createElement("div");
   panel.className = "instagram-screen";
-  if (!featuredPost.embedAvailable) {
+  if (!featured.embedAvailable) {
     const fallback = document.createElement("a");
     fallback.className = "instagram-fallback";
-    fallback.href = featuredPost.url;
+    fallback.href = featured.url;
     fallback.target = "_blank";
     fallback.rel = "noreferrer";
     const badge = document.createElement("span"); badge.textContent = "INSTAGRAM REEL";
-    const handle = document.createElement("strong"); handle.textContent = featuredPost.username;
+    const handle = document.createElement("strong"); handle.textContent = featured.username;
     const note = document.createElement("small"); note.textContent = "Conteúdo restrito • abrir no Instagram ↗";
     fallback.append(badge, handle, note); panel.appendChild(fallback);
     return new CSS3DObject(panel);
   }
-  const header = document.createElement("div"); header.className = "screen-header"; header.innerHTML = `<b>DESTAQUE ATUAL</b><span>• ${featuredPost.username}</span>`;
-  const left = document.createElement("div"); left.className = "screen-side screen-left"; left.innerHTML = `<small>LANCE ATUAL</small><strong>R$ 1.780</strong><p>IDEIAS GANHAM<br/>MAIS VISTA</p>`;
+  const header = document.createElement("div"); header.className = "screen-header"; header.innerHTML = `<b>DESTAQUE ATUAL</b><span>• ${featured.username}</span>`;
+  const bid = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(featured.bid / 100);
+  const left = document.createElement("div"); left.className = "screen-side screen-left"; left.innerHTML = `<small>LANCE ATUAL</small><strong>${bid}</strong><p>IDEIAS GANHAM<br/>MAIS VISTA</p>`;
   const right = document.createElement("div"); right.className = "screen-side screen-right"; right.innerHTML = `<strong>${countdown}</strong><p>MARCAS QUE CHEGAM<br/>MAIS LONGE</p>`;
   const iframe = document.createElement("iframe");
-  iframe.src = instagramEmbedUrl(featuredPost.shortcode);
-  iframe.title = `Reel em primeiro lugar de ${featuredPost.username}`;
+  iframe.src = instagramEmbedUrl(featured.shortcode);
+  iframe.title = `Reel em primeiro lugar de ${featured.username}`;
   iframe.loading = "eager";
   iframe.allow = "encrypted-media; fullscreen; picture-in-picture";
   iframe.setAttribute("scrolling", "no");
@@ -88,7 +90,7 @@ function makeInstagramScreen(countdown: string) {
   return new CSS3DObject(panel);
 }
 
-export default function Arena3D({ countdown, playerNickname, onboarding, onQuickMessage, onNicknameRequest, onPlayerLocated }: { countdown: string; playerNickname: string; onboarding: boolean; onQuickMessage: (text: string) => void; onNicknameRequest: () => void; onPlayerLocated: () => void }) {
+export default function Arena3D({ countdown, featured, podium, playerNickname, onboarding, onQuickMessage, onNicknameRequest, onPlayerLocated }: { countdown: string; featured: ArenaFeatured; podium: ArenaFeatured[]; playerNickname: string; onboarding: boolean; onQuickMessage: (text: string) => void; onNicknameRequest: () => void; onPlayerLocated: () => void }) {
   const host = useRef<HTMLDivElement>(null);
   const screenMaterials = useRef<THREE.MeshStandardMaterial[]>([]);
   const playerRef = useRef<THREE.Object3D | null>(null);
@@ -215,14 +217,15 @@ export default function Arena3D({ countdown, playerNickname, onboarding, onQuick
       const sideCover = new THREE.Mesh(new THREE.BoxGeometry(.55, 7.15, 1.12), frameMaterial);
       sideCover.position.x = x; sideCover.castShadow = true; screenGroup.add(sideCover);
     }
-    const texture = textTexture(["1º LUGAR • REEL", "R$ 1.780", featuredPost.username, `Instagram • ${featuredPost.shortcode}`]);
+    const featuredBid = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(featured.bid / 100);
+    const texture = textTexture(["1º LUGAR • REEL", featuredBid, featured.username, `Instagram • ${featured.shortcode}`]);
     const mat = new THREE.MeshStandardMaterial({ map: texture, emissive: 0x27334d, emissiveIntensity: .55, side: THREE.FrontSide });
     const backMat = mat.clone();
     screenMaterials.current = [mat, backMat];
     const front = new THREE.Mesh(new THREE.PlaneGeometry(9.2, 6.1), mat); front.position.z = .34; screenGroup.add(front);
     const back = new THREE.Mesh(new THREE.PlaneGeometry(9.2, 6.1), backMat); back.position.z = -.34; back.rotation.y = Math.PI; screenGroup.add(back);
-    const frontEmbed = makeInstagramScreen(countdown); frontEmbed.position.z = .37; frontEmbed.scale.setScalar(.01); screenGroup.add(frontEmbed);
-    const backEmbed = makeInstagramScreen(countdown); backEmbed.position.z = -.37; backEmbed.rotation.y = Math.PI; backEmbed.scale.setScalar(.01); screenGroup.add(backEmbed);
+    const frontEmbed = makeInstagramScreen(countdown, featured); frontEmbed.position.z = .37; frontEmbed.scale.setScalar(.01); screenGroup.add(frontEmbed);
+    const backEmbed = makeInstagramScreen(countdown, featured); backEmbed.position.z = -.37; backEmbed.rotation.y = Math.PI; backEmbed.scale.setScalar(.01); screenGroup.add(backEmbed);
     scene.add(screenGroup);
 
     const trussMat = new THREE.MeshStandardMaterial({ color: 0x111827, metalness: .9, roughness: .24 });
@@ -236,10 +239,14 @@ export default function Arena3D({ countdown, playerNickname, onboarding, onQuick
       const casing = new THREE.Mesh(new THREE.BoxGeometry(.42, .28, .5), trussMat); casing.position.set(x, 8.45, .2); scene.add(casing);
     });
 
-    const rankingPosters = [
-      { side: -1, rank: "#2", username: "@cafecentral", bid: "R$ 1.650", accent: "#b892ff" },
-      { side: 1, rank: "#3", username: "@academiaflow", bid: "R$ 1.520", accent: "#ff7ce5" },
+    const fallbackPodium = [
+      { rank: 2, username: "Aguardando lance", bid: 0 },
+      { rank: 3, username: "Aguardando lance", bid: 0 },
     ];
+    const rankingPosters = [podium[1] || fallbackPodium[0], podium[2] || fallbackPodium[1]].map((entry, index) => ({
+      side: index === 0 ? -1 : 1, rank: `#${index + 2}`, username: entry.username,
+      bid: new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(entry.bid / 100), accent: index === 0 ? "#b892ff" : "#ff7ce5",
+    }));
     rankingPosters.forEach(({ side, rank, username, bid, accent }) => {
       const poster = new THREE.Group();
       poster.position.set(side * 7.2, 3.1, .15); poster.rotation.y = side * -.14;
@@ -406,7 +413,7 @@ export default function Arena3D({ countdown, playerNickname, onboarding, onQuick
     return () => { window.removeEventListener("resize", resize); renderer.domElement.removeEventListener("pointerdown", onPointerDown); renderer.domElement.removeEventListener("pointerup", onPointerUp); cancelAnimationFrame(frameId); controls.dispose(); renderer.dispose(); playerRef.current = null; container.removeChild(renderer.domElement); container.removeChild(cssRenderer.domElement); };
   // countdown is updated on the existing screen materials below; rebuilding the 3D scene every second would be expensive.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onNicknameRequest, onPlayerLocated, onQuickMessage, onboarding, playerNickname]);
+  }, [featured, onNicknameRequest, onPlayerLocated, onQuickMessage, onboarding, playerNickname, podium]);
 
   useEffect(() => {
     if (!screenMaterials.current.length) return;
@@ -414,10 +421,10 @@ export default function Arena3D({ countdown, playerNickname, onboarding, onQuick
       material.map?.dispose();
       // Three.js materials are mutable runtime resources owned by this effect.
       // eslint-disable-next-line react-hooks/immutability
-      material.map = textTexture(["1º LUGAR • REEL", "R$ 1.780", featuredPost.username, `Termina em ${countdown}`]);
+      material.map = textTexture(["1º LUGAR • REEL", new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(featured.bid / 100), featured.username, `Termina em ${countdown}`]);
       material.needsUpdate = true;
     }
-  }, [countdown]);
+  }, [countdown, featured]);
 
   return <div ref={host} className="arena" aria-label="Arena 3D interativa do No Topo" />;
 }

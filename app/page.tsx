@@ -3,19 +3,18 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Minus, Plus, Send } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { featuredPost } from "@/lib/featured-post.mjs";
+import BidCheckoutDialog from "@/components/bid-checkout-dialog";
 import { moderateMessage } from "@/lib/chat-moderation.mjs";
 import { createVisitorNickname, normalizeNickname } from "@/lib/player-identity.mjs";
+import { fetchArenaState, formatCents } from "@/lib/no-topo-api.mjs";
+import { arenaViewFromState, demoArenaView } from "@/lib/live-arena.mjs";
 
 const Arena = dynamic(() => import("@/components/arena-3d"), { ssr: false });
-const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
-
 export default function Home() {
-  const [offer, setOffer] = useState(1800);
+  const [offer, setOffer] = useState(2000);
   const [open, setOpen] = useState(false);
-  const [remaining, setRemaining] = useState("02:14:37");
-  const [target] = useState(() => Date.now() + 8077000);
+  const [remaining, setRemaining] = useState("00:00:00");
+  const [arenaView, setArenaView] = useState(demoArenaView);
   const [chatText, setChatText] = useState("");
   const [playerNickname, setPlayerNickname] = useState("Visitante 482");
   const [nicknameOpen, setNicknameOpen] = useState(false);
@@ -44,8 +43,26 @@ export default function Home() {
     window.localStorage.setItem("no-topo-player-onboarded", "1");
   }, []);
 
+  const refreshArena = useCallback(async () => {
+    try {
+      const state = await fetchArenaState(fetch);
+      setArenaView((current) => {
+        const next = arenaViewFromState(state, current);
+        setOffer((value) => Math.max(value, next.nextBidCents));
+        return next;
+      });
+    } catch { /* Preserve the last known good arena while connectivity recovers. */ }
+  }, []);
+
+  useEffect(() => {
+    const initial = window.setTimeout(() => void refreshArena(), 0);
+    const poll = window.setInterval(() => { if (!document.hidden) void refreshArena(); }, 10000);
+    return () => { window.clearTimeout(initial); window.clearInterval(poll); };
+  }, [refreshArena]);
+
   useEffect(() => {
     const tick = () => {
+      const target = arenaView.protectedUntil ? new Date(arenaView.protectedUntil).getTime() : Date.now();
       const seconds = Math.max(0, Math.floor((target - Date.now()) / 1000));
       const h = String(Math.floor(seconds / 3600)).padStart(2, "0");
       const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, "0");
@@ -55,7 +72,7 @@ export default function Home() {
     tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
-  }, [target]);
+  }, [arenaView.protectedUntil]);
 
   useEffect(() => {
     const focusChatOnEnter = (event: KeyboardEvent) => {
@@ -75,21 +92,21 @@ export default function Home() {
   }, [playerNickname]);
 
   return <main className="app-shell">
-    <Arena countdown={remaining} playerNickname={playerNickname} onboarding={onboarding} onQuickMessage={publishMessage} onNicknameRequest={openNickname} onPlayerLocated={dismissOnboarding} />
+    <Arena countdown={remaining} featured={arenaView.featured} podium={arenaView.podium} playerNickname={playerNickname} onboarding={onboarding} onQuickMessage={publishMessage} onNicknameRequest={openNickname} onPlayerLocated={dismissOnboarding} />
     <div className="vignette" />
     <header className="topbar glass">
       <a className="brand" href="#" aria-label="No Topo"><span className="brand-mark">↗</span><b>NO TOPO</b></a>
       <nav><a href="#como">Como funciona</a><a href="#ranking">Ranking</a><a href="#recordes">Recordes</a></nav>
       <div className="live"><span /> 127 ONLINE</div>
-      <button className="lime-button small" onClick={() => setOpen(true)}>DAR UM LANCE</button>
+      <button className="lime-button small" disabled={remaining !== "00:00:00"} onClick={() => setOpen(true)}>DAR UM LANCE</button>
     </header>
 
     <section className="status-card glass" aria-label="Destaque atual">
       <div className="eyebrow"><ArrowUpRight size={14}/> DESTAQUE ATUAL</div>
-      <strong>{featuredPost.username}</strong>
-      <div className="status-row"><span>Lance atual</span><b>R$ 1.780</b></div>
-      <div className="status-row"><span>Termina em</span><b className="timer">{remaining}</b></div>
-      <a className="post-link" href={featuredPost.url} target="_blank" rel="noreferrer">VER REEL NO INSTAGRAM <ArrowUpRight size={13}/></a>
+      <strong>{arenaView.featured.username}</strong>
+      <div className="status-row"><span>Lance atual</span><b>{formatCents(arenaView.featured.bid)}</b></div>
+      <div className="status-row"><span>Proteção</span><b className="timer">{remaining}</b></div>
+      <a className="post-link" href={arenaView.featured.url} target="_blank" rel="noreferrer">VER REEL NO INSTAGRAM <ArrowUpRight size={13}/></a>
     </section>
 
     <div className="hint glass"><ArrowUpRight size={18}/><span>clique para andar ou sentar</span><i/> <span>arraste para girar</span></div>
@@ -141,20 +158,11 @@ export default function Home() {
     </div>
 
     <section className="bidbar glass">
-      <div className="bid-caption"><span>Seu próximo lance</span><small>mínimo de R$ 20</small></div>
-      <div className="stepper"><button onClick={() => setOffer(Math.max(1800, offer - 20))} aria-label="Diminuir"><Minus/></button><b>{money.format(offer)}</b><button onClick={() => setOffer(offer + 20)} aria-label="Aumentar"><Plus/></button></div>
-      <button className="lime-button" onClick={() => setOpen(true)}>ASSUMIR A TELA <ArrowUpRight/></button>
+      <div className="bid-caption"><span>Seu próximo lance</span><small>mínimo {formatCents(arenaView.nextBidCents)}</small></div>
+      <div className="stepper"><button onClick={() => setOffer(Math.max(arenaView.nextBidCents, offer - 2000))} aria-label="Diminuir"><Minus/></button><b>{formatCents(offer)}</b><button onClick={() => setOffer(offer + 2000)} aria-label="Aumentar"><Plus/></button></div>
+      <button className="lime-button" disabled={remaining !== "00:00:00"} onClick={() => setOpen(true)}>{remaining !== "00:00:00" ? "TOPO PROTEGIDO" : "ASSUMIR A TELA"} <ArrowUpRight/></button>
     </section>
 
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="border-white/10 bg-[#0b1017] text-white sm:max-w-lg">
-        <DialogHeader><DialogTitle className="text-2xl font-black">Assumir a tela</DialogTitle><DialogDescription className="text-white/50">Protótipo seguro: nenhuma cobrança real será realizada.</DialogDescription></DialogHeader>
-        <div className="demo-price"><small>Seu lance demonstrativo</small><strong>{money.format(offer)}</strong></div>
-        <label className="form-field">Perfil<input defaultValue={featuredPost.username} /></label>
-        <label className="form-field">Link da publicação<input defaultValue={featuredPost.url} /></label>
-        <label className="form-field">E-mail<input type="email" placeholder="voce@exemplo.com" /></label>
-        <button className="lime-button full" onClick={() => setOpen(false)}>SIMULAR ENTRADA NA DISPUTA</button>
-      </DialogContent>
-    </Dialog>
+    <BidCheckoutDialog open={open} onOpenChange={setOpen} amountCents={offer} nickname={playerNickname} defaultPostUrl={arenaView.featured.url} onApproved={() => { setOpen(false); void refreshArena(); }} />
   </main>;
 }
