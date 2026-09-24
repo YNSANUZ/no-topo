@@ -1,11 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Minus, Plus, Send } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { featuredPost } from "@/lib/featured-post.mjs";
 import { moderateMessage } from "@/lib/chat-moderation.mjs";
+import { createVisitorNickname, normalizeNickname } from "@/lib/player-identity.mjs";
 
 const Arena = dynamic(() => import("@/components/arena-3d"), { ssr: false });
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
@@ -16,11 +17,32 @@ export default function Home() {
   const [remaining, setRemaining] = useState("02:14:37");
   const [target] = useState(() => Date.now() + 8077000);
   const [chatText, setChatText] = useState("");
-  const playerNickname = "Visitante 482";
+  const [playerNickname, setPlayerNickname] = useState("Visitante 482");
+  const [nicknameOpen, setNicknameOpen] = useState(false);
+  const [nicknameDraft, setNicknameDraft] = useState("");
+  const [nicknameError, setNicknameError] = useState("");
+  const [onboarding, setOnboarding] = useState(true);
   const playerColor = "#b9ff38";
   const [chatMessages, setChatMessages] = useState<Array<{ id: number; text: string; nickname: string; color: string }>>([]);
   const [chatError, setChatError] = useState("");
   const chatInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const stored = window.localStorage.getItem("no-topo-player-nickname");
+      const fallback = window.localStorage.getItem("no-topo-visitor-name") || createVisitorNickname();
+      window.localStorage.setItem("no-topo-visitor-name", fallback);
+      setPlayerNickname(stored || fallback);
+      setOnboarding(window.localStorage.getItem("no-topo-player-onboarded") !== "1");
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const openNickname = useCallback(() => { setNicknameDraft(""); setNicknameError(""); setNicknameOpen(true); }, []);
+  const dismissOnboarding = useCallback(() => {
+    setOnboarding(false);
+    window.localStorage.setItem("no-topo-player-onboarded", "1");
+  }, []);
 
   useEffect(() => {
     const tick = () => {
@@ -47,13 +69,13 @@ export default function Home() {
     return () => window.removeEventListener("keydown", focusChatOnEnter);
   }, []);
 
-  const publishMessage = (text: string) => {
+  const publishMessage = useCallback((text: string) => {
     const message = { id: Date.now(), text, nickname: playerNickname, color: playerColor };
     setChatMessages((current) => [...current.slice(-3), message]);
-  };
+  }, [playerNickname]);
 
   return <main className="app-shell">
-    <Arena countdown={remaining} playerNickname={playerNickname} onQuickMessage={publishMessage} />
+    <Arena countdown={remaining} playerNickname={playerNickname} onboarding={onboarding} onQuickMessage={publishMessage} onNicknameRequest={openNickname} onPlayerLocated={dismissOnboarding} />
     <div className="vignette" />
     <header className="topbar glass">
       <a className="brand" href="#" aria-label="No Topo"><span className="brand-mark">↗</span><b>NO TOPO</b></a>
@@ -71,6 +93,29 @@ export default function Home() {
     </section>
 
     <div className="hint glass"><ArrowUpRight size={18}/><span>clique para andar ou sentar</span><i/> <span>arraste para girar</span></div>
+
+    {!onboarding && <button className="locate-player glass" type="button" onClick={() => setOnboarding(true)}>Onde estou?</button>}
+
+    {nicknameOpen && <div className="nickname-card glass" role="dialog" aria-modal="true" aria-labelledby="nickname-title">
+      <strong id="nickname-title">Escolha seu apelido</strong>
+      <small>Os outros visitantes verão este nome.</small>
+      <form onSubmit={(event) => {
+        event.preventDefault();
+        const result = normalizeNickname(nicknameDraft, playerNickname);
+        if (!result.allowed) {
+          setNicknameError(result.reason === "email" ? "Não use e-mail." : result.reason === "numbers" ? "Não use números de contato." : result.reason === "link" ? "Não use links." : "Escolha outro apelido.");
+          return;
+        }
+        setPlayerNickname(result.nickname);
+        window.localStorage.setItem("no-topo-player-nickname", result.nickname);
+        setNicknameOpen(false);
+        dismissOnboarding();
+      }}>
+        <input autoFocus maxLength={20} value={nicknameDraft} onChange={(event) => { setNicknameDraft(event.target.value); setNicknameError(""); }} placeholder={playerNickname} aria-label="Apelido" />
+        {nicknameError && <span role="alert">{nicknameError}</span>}
+        <div><button type="button" onClick={() => { setNicknameOpen(false); dismissOnboarding(); }}>Agora não</button><button type="submit">Usar apelido</button></div>
+      </form>
+    </div>}
 
     <div className="chat-area">
       <div className="chat-feed" aria-live="polite">

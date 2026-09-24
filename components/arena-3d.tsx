@@ -88,7 +88,7 @@ function makeInstagramScreen(countdown: string) {
   return new CSS3DObject(panel);
 }
 
-export default function Arena3D({ countdown, playerNickname, onQuickMessage }: { countdown: string; playerNickname: string; onQuickMessage: (text: string) => void }) {
+export default function Arena3D({ countdown, playerNickname, onboarding, onQuickMessage, onNicknameRequest, onPlayerLocated }: { countdown: string; playerNickname: string; onboarding: boolean; onQuickMessage: (text: string) => void; onNicknameRequest: () => void; onPlayerLocated: () => void }) {
   const host = useRef<HTMLDivElement>(null);
   const screenMaterials = useRef<THREE.MeshStandardMaterial[]>([]);
   const playerRef = useRef<THREE.Object3D | null>(null);
@@ -291,7 +291,7 @@ export default function Arena3D({ countdown, playerNickname, onQuickMessage }: {
       const player = clone(playerSource.scene);
       player.scale.setScalar(.66); player.position.set(0, .1, 15.2); player.rotation.y = Math.PI;
       player.traverse((o) => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).castShadow = true; });
-      const playerLabel = makeLabel(playerNickname); playerLabel.scale.set(3.4, .8, 1);
+      const playerLabel = makeLabel(onboarding ? "Digite e escolha um apelido" : playerNickname); playerLabel.scale.set(onboarding ? 5.6 : 3.4, .8, 1);
       player.add(playerLabel); playerLabel.position.y = 2.75;
       scene.add(player); playerRef.current = player;
       const playerMixer = new THREE.AnimationMixer(player);
@@ -312,6 +312,7 @@ export default function Arena3D({ countdown, playerNickname, onQuickMessage }: {
       mixers.push(playerMixer);
       playerHalo = new THREE.Mesh(new THREE.RingGeometry(.58, .78, 32), new THREE.MeshBasicMaterial({ color: LIME, transparent: true, opacity: .85, side: THREE.DoubleSide }));
       playerHalo.rotation.x = -Math.PI / 2; playerHalo.position.set(player.position.x, .08, player.position.z); scene.add(playerHalo);
+      playerHalo.visible = onboarding;
 
       const menuElement = document.createElement("div"); menuElement.className = "avatar-actions";
       const danceButton = document.createElement("button"); danceButton.type = "button"; danceButton.textContent = "Dançar";
@@ -332,6 +333,7 @@ export default function Arena3D({ countdown, playerNickname, onQuickMessage }: {
       pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
       raycaster.setFromCamera(pointer, camera);
       const clickedPlayer = playerRef.current && raycaster.intersectObject(playerRef.current, true).length > 0;
+      if (clickedPlayer && onboarding) { onNicknameRequest(); return; }
       if (clickedPlayer && playerActionMenu) { playerActionMenu.visible = !playerActionMenu.visible; return; }
       if (playerActionMenu) playerActionMenu.visible = false;
       const hit = raycaster.intersectObjects([...seatMeshes, floorPicker], false)[0];
@@ -345,6 +347,7 @@ export default function Arena3D({ countdown, playerNickname, onQuickMessage }: {
         const target = clampArenaTarget({ x: hit.point.x, z: hit.point.z }, 16.3);
         playerState.target.set(target.x, .1, target.z); playerState.sitting = false;
       }
+      onPlayerLocated();
     };
     renderer.domElement.addEventListener("pointerdown", onPointerDown);
     renderer.domElement.addEventListener("pointerup", onPointerUp);
@@ -355,7 +358,10 @@ export default function Arena3D({ countdown, playerNickname, onQuickMessage }: {
       frameId = requestAnimationFrame(animate);
       const delta = Math.min(clock.getDelta(), .05); const t = clock.elapsedTime;
       mixers.forEach((mixer) => mixer.update(delta));
-      rim.material instanceof THREE.MeshBasicMaterial && (rim.material.opacity = .75 + Math.sin(t * 2) * .2, rim.material.transparent = true);
+      if (rim.material instanceof THREE.MeshBasicMaterial) {
+        rim.material.opacity = .75 + Math.sin(t * 2) * .2;
+        rim.material.transparent = true;
+      }
       for (const person of animatedPeople) {
         const motion = getNpcMotion(person.kind, t, person.phase);
         if (person.kind === "walking") {
@@ -378,7 +384,15 @@ export default function Arena3D({ countdown, playerNickname, onQuickMessage }: {
           player.position.y = THREE.MathUtils.lerp(player.position.y, playerState.target.y, .18);
           if (playerState.sitting) player.rotation.y = THREE.MathUtils.lerp(player.rotation.y, playerState.targetRotation, .16);
         }
-        if (playerHalo) playerHalo.position.set(player.position.x, .08, player.position.z);
+        if (playerHalo) {
+          playerHalo.position.set(player.position.x, .08, player.position.z);
+          if (onboarding && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            const pulse = 1 + Math.sin(t * 3.2) * .18;
+            playerHalo.scale.setScalar(pulse);
+            const material = playerHalo.material as THREE.MeshBasicMaterial;
+            material.opacity = .62 + Math.sin(t * 3.2) * .25;
+          }
+        }
         if (playerActionMenu) {
           playerActionMenu.position.set(player.position.x + 1.45, player.position.y + 2.05, player.position.z);
           playerActionMenu.quaternion.copy(camera.quaternion);
@@ -390,12 +404,16 @@ export default function Arena3D({ countdown, playerNickname, onQuickMessage }: {
     const resize = () => { const nextAspect = container.clientWidth / container.clientHeight; camera.aspect = nextAspect; const view = getCameraView(nextAspect); camera.fov = view.fov; if (nextAspect < .8) camera.position.set(view.x, view.y, view.z); camera.updateProjectionMatrix(); renderer.setSize(container.clientWidth, container.clientHeight); cssRenderer.setSize(container.clientWidth, container.clientHeight); };
     window.addEventListener("resize", resize);
     return () => { window.removeEventListener("resize", resize); renderer.domElement.removeEventListener("pointerdown", onPointerDown); renderer.domElement.removeEventListener("pointerup", onPointerUp); cancelAnimationFrame(frameId); controls.dispose(); renderer.dispose(); playerRef.current = null; container.removeChild(renderer.domElement); container.removeChild(cssRenderer.domElement); };
-  }, []);
+  // countdown is updated on the existing screen materials below; rebuilding the 3D scene every second would be expensive.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onNicknameRequest, onPlayerLocated, onQuickMessage, onboarding, playerNickname]);
 
   useEffect(() => {
     if (!screenMaterials.current.length) return;
     for (const material of screenMaterials.current) {
       material.map?.dispose();
+      // Three.js materials are mutable runtime resources owned by this effect.
+      // eslint-disable-next-line react-hooks/immutability
       material.map = textTexture(["1º LUGAR • REEL", "R$ 1.780", featuredPost.username, `Termina em ${countdown}`]);
       material.needsUpdate = true;
     }
