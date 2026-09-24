@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "cycle": {
+    "id": "2026-09-24",
+    "startsAt": "2026-09-24T03:00:00+00:00",
+    "endsAt": "2026-09-25T03:00:00+00:00"
+  },
+  "baseBidCents": 2000,
+  "incrementCents": 2000,
+  "protectionSeconds": 600,
+  "reservationSeconds": 300,
+  "ranking": [],
+  "reservations": []
+}
