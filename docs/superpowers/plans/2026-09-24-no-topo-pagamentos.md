@@ -428,12 +428,15 @@ git commit -m "feat: add No Topo Hall da Fama"
 - Create: `hooks/use-arena-announcer.ts`
 - Create: `lib/arena-announcer.mjs`
 - Create: `lib/arena-announcer.test.mjs`
+- Create: `lib/player-identity.mjs`
+- Create: `lib/player-identity.test.mjs`
+- Create: `components/player-nickname.tsx`
 - Modify: `app/page.tsx`
 - Modify: `app/globals.css`
 
 **Interfaces:**
 - Consumes: live arena state and ranking preview.
-- Produces: clickable “COMO FUNCIONA” and “HALL DA FAMA” meshes, accessible HTML dialog, `announcementForEntry(state, session)`, and mute control.
+- Produces: clickable “COMO FUNCIONA” and “HALL DA FAMA” meshes, accessible HTML dialog, `announcementForEntry(state, session)`, mute control, local avatar aura, and moderated persistent nickname.
 
 - [ ] **Step 1: Write failing announcer tests**
 
@@ -447,6 +450,8 @@ test('announces one conquest once per device', () => {
 });
 ```
 
+Add identity tests proving that blank input keeps the generated visitor name, accepted nicknames are trimmed and limited to 20 characters, and profanity, email, URL, and contact-number patterns are rejected. Test that the onboarding aura starts visible, becomes hidden after movement/name choice/dismissal, and becomes a static ring under reduced motion.
+
 - [ ] **Step 2: Run and verify RED**
 
 Run: `node --test lib/arena-announcer.test.mjs`
@@ -455,7 +460,7 @@ Expected: FAIL because announcer functions are absent.
 
 - [ ] **Step 3: Implement plaques, dialog, speech, and mute**
 
-Render the five approved rules and live bid values on the explanation plaque texture. Use Three.js raycasting to open the HTML dialog and `window.open('/ranking', '_blank', 'noopener,noreferrer')` for Hall da Fama. In the hook, queue `SpeechSynthesisUtterance` until the first pointer/keyboard interaction, select a `pt-BR` voice when available, store entry/conquest keys in `sessionStorage`, and store mute preference in `localStorage`.
+Render the five approved rules and live bid values on the explanation plaque texture. Use Three.js raycasting to open the HTML dialog and `window.open('/ranking', '_blank', 'noopener,noreferrer')` for Hall da Fama. In the hook, queue `SpeechSynthesisUtterance` until the first pointer/keyboard interaction, select a `pt-BR` voice when available, store entry/conquest keys in `sessionStorage`, and store mute preference in `localStorage`. Generate and persist `Visitante NNN` locally, show “Digite e escolha um apelido” only above the local avatar, and open a compact nickname input when clicked. Reuse chat moderation plus URL/contact checks. Add one local-only aura mesh that follows the avatar and disappears after movement, accepted nickname, or dismissal; expose “Onde estou?” to restore it.
 
 - [ ] **Step 4: Run tests, lint, and build**
 

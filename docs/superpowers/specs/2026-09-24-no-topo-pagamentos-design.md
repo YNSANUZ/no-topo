@@ -80,6 +80,14 @@ Uma placa iluminada próxima à entrada do coliseu explica a mecânica sem compe
 
 No celular, tocar na placa abre um painel HTML legível com o mesmo conteúdo. A placa 3D não recebe texto financeiro estático: valores vêm sempre do estado confirmado pelo servidor.
 
+## Identificação do próprio avatar
+
+Na primeira entrada, o avatar do visitante recebe uma aura luminosa suave e pulsante para indicar sua posição na arena. A aura é local: somente o próprio visitante a vê, nunca os demais. Ela permanece até a pessoa mover o avatar, escolher um apelido ou dispensar a orientação; em novas visitas pode ser reativada pelo controle “Onde estou?”. `prefers-reduced-motion` troca a pulsação por um anel estático.
+
+Acima do avatar, apenas para o próprio visitante, aparece “Digite e escolha um apelido”. O texto abre um campo compacto que aceita entre 2 e 20 caracteres. Apelidos passam pela mesma moderação do chat e rejeitam palavrões, e-mails, links, telefones e sequências de contato. Depois da escolha, o nome fica salvo localmente e é usado no chat e na presença da sala. Se a pessoa ignorar ou deixar vazio, recebe um nome aleatório persistente no dispositivo no formato “Visitante 482”.
+
+Outros visitantes nunca veem a instrução de cadastro: veem somente o apelido escolhido ou o nome automático. Na primeira versão, sem presença em tempo real, essa identidade controla o avatar local e as mensagens locais; a sincronização entre pessoas exige o serviço de presença previsto para a etapa online do chat.
+
 ## Anúncio por voz
 
 O navegador usa `speechSynthesis` para anunciar “O primeiro lugar é” seguido do apelido público. Um visitante ouve o anúncio de entrada uma única vez por sessão. A chave gravada em `sessionStorage` inclui o ciclo e o identificador do vencedor, mas mudanças posteriores não repetem o anúncio de entrada.
