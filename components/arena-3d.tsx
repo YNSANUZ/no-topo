@@ -13,6 +13,7 @@ import type { ArenaFeatured } from "../lib/live-arena.mjs";
 const LIME = 0xb9ff38;
 const NAVY = 0x19305f;
 const modelPaths = ["a", "c", "f", "j", "n", "r"].map((id) => `/models/kenney/character-${id}.glb`);
+const foundingProfiles = ["@primusdf", "@ursoninhos", "@ynsanuz", "@saiunodf"];
 
 function textTexture(lines: string[], accent = "#b9ff38") {
   const canvas = document.createElement("canvas");
@@ -232,8 +233,8 @@ export default function Arena3D({ countdown, featured, podium, playerNickname, o
     });
 
     const fallbackPodium = [
-      { rank: 2, username: "Aguardando lance", bid: 0 },
-      { rank: 3, username: "Aguardando lance", bid: 0 },
+      { rank: 2, username: "@primusdf", bid: 0 },
+      { rank: 3, username: "@ursoninhos", bid: 0 },
     ];
     const formatDuration = (seconds?: number | null) => seconds == null ? "AGUARDANDO" : seconds >= 3600 ? `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}min` : `${Math.max(1, Math.floor(seconds / 60))} min`;
     const rankingPosters = [podium[1] || fallbackPodium[0], podium[2] || fallbackPodium[1]].map((entry, index) => ({
@@ -282,7 +283,8 @@ export default function Arena3D({ countdown, featured, podium, playerNickname, o
           mixer.update(sitClip.duration + .01);
         }
         scene.add(person); animatedPeople.push({ object: person, baseY: person.position.y, phase: index * .47, kind: "seated" });
-        if ([4, 19, 41].includes(index)) { const label = makeLabel(["@cafecentral", "@academiaflow", "@lojavertice"][[4,19,41].indexOf(index)]); label.position.copy(position).add(new THREE.Vector3(0, 2.2, 0)); scene.add(label); }
+        const namedNpcIndexes = [4, 19, 41, 58];
+        if (namedNpcIndexes.includes(index)) { const label = makeLabel(foundingProfiles[namedNpcIndexes.indexOf(index)]); label.position.copy(position).add(new THREE.Vector3(0, 2.2, 0)); scene.add(label); }
       });
 
       for (let index = 0; index < 5; index += 1) {
