@@ -4,12 +4,14 @@ import { FormEvent, useCallback, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import MercadoPagoBrick from "@/components/mercado-pago-brick";
 import { createBidSession, formatCents } from "@/lib/no-topo-api.mjs";
+import { calculateBidOutcome, type ProtectionRules } from "@/lib/bid-outcome.mjs";
 
-export default function BidCheckoutDialog({ open, onOpenChange, amountCents, nickname, defaultPostUrl, onApproved }: { open: boolean; onOpenChange: (open: boolean) => void; amountCents: number; nickname: string; defaultPostUrl: string; onApproved: () => void }) {
+export default function BidCheckoutDialog({ open, onOpenChange, amountCents, nickname, defaultPostUrl, baseBidCents, incrementCents, rules, onApproved }: { open: boolean; onOpenChange: (open: boolean) => void; amountCents: number; nickname: string; defaultPostUrl: string; baseBidCents: number; incrementCents: number; rules: ProtectionRules; onApproved: () => void }) {
   const [reservation, setReservation] = useState<{ reservationId: string; amountCents: number } | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  const outcome = calculateBidOutcome({ amountCents, baseBidCents, incrementCents, rules });
 
   const paymentStatus = useCallback((next: string) => {
     setStatus(next);
@@ -32,6 +34,7 @@ export default function BidCheckoutDialog({ open, onOpenChange, amountCents, nic
     <DialogContent className="border-white/10 bg-[#0b1017] text-white sm:max-w-lg max-h-[92dvh] overflow-y-auto">
       <DialogHeader><DialogTitle className="text-2xl font-black">Assumir a tela</DialogTitle><DialogDescription className="text-white/50">O pagamento só vale após confirmação do Mercado Pago. O primeiro lugar fica protegido por 10 minutos.</DialogDescription></DialogHeader>
       <div className="demo-price"><small>Seu lance</small><strong>{formatCents(amountCents)}</strong></div>
+      <p className="checkout-note">Este valor garante {Math.round(outcome.protectionSeconds / 60)} minutos sem ultrapassagem. Depois, seu destaque permanece até alguém cobrir a partir de {formatCents(outcome.nextBidCents)}; esse mínimo diminui {formatCents(incrementCents)} por hora.</p>
       {!reservation && <form className="checkout-details" onSubmit={reserve}>
         <label className="form-field">Apelido<input value={nickname} readOnly /></label>
         <label className="form-field">Link da publicação<input name="postUrl" type="url" required defaultValue={defaultPostUrl} /></label>

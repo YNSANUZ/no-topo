@@ -26,6 +26,10 @@ $now = new DateTimeImmutable('2026-09-24 12:00:00', new DateTimeZone('America/Sa
 $state = no_topo_empty_state($now);
 $public = no_topo_arena_state($state, $now);
 api_same(2000, $public['nextBidCents'], 'public next bid');
+api_same(600, $public['protectionRules']['baseSeconds'], 'public base protection');
+api_same(120, $public['protectionRules']['incrementSeconds'], 'public protection increment');
+api_same(3600, $public['protectionRules']['maxSeconds'], 'public protection cap');
+api_same(null, $public['cycle']['endsAt'], 'public cycle has no daily reset');
 api_same([], $public['ranking'], 'empty public ranking');
 
 $created = no_topo_create_bid_session($state, [

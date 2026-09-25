@@ -13,12 +13,19 @@ function no_topo_arena_state(array $state, DateTimeImmutable $now): array
         'amountCents' => $entry['amountCents'],
         'approvedAt' => $entry['approvedAt'],
         'protectedUntil' => $entry['protectedUntil'],
+        'endedAt' => $entry['endedAt'] ?? null,
+        'durationSeconds' => $entry['durationSeconds'] ?? null,
     ], array_slice($state['ranking'] ?? [], 0, 100));
     return [
         'cycle' => $state['cycle'],
         'baseBidCents' => $state['baseBidCents'],
         'incrementCents' => $state['incrementCents'],
         'nextBidCents' => no_topo_next_bid($state, $now),
+        'protectionRules' => [
+            'baseSeconds' => NO_TOPO_PROTECTION_SECONDS,
+            'incrementSeconds' => NO_TOPO_PROTECTION_INCREMENT_SECONDS,
+            'maxSeconds' => NO_TOPO_MAX_PROTECTION_SECONDS,
+        ],
         'protectedUntil' => $ranking[0]['protectedUntil'] ?? null,
         'ranking' => $ranking,
     ];

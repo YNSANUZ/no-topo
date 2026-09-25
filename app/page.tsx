@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Minus, Plus, Send } from "lucide-react";
 import BidCheckoutDialog from "@/components/bid-checkout-dialog";
+import BidOutcomeDialog from "@/components/bid-outcome-dialog";
 import { moderateMessage } from "@/lib/chat-moderation.mjs";
 import { createVisitorNickname, normalizeNickname } from "@/lib/player-identity.mjs";
 import { fetchArenaState, formatCents } from "@/lib/no-topo-api.mjs";
@@ -15,6 +16,7 @@ const Arena = dynamic(() => import("@/components/arena-3d"), { ssr: false });
 export default function Home() {
   const [offer, setOffer] = useState(2000);
   const [open, setOpen] = useState(false);
+  const [outcomeOpen, setOutcomeOpen] = useState(false);
   const [remaining, setRemaining] = useState("00:00:00");
   const [arenaView, setArenaView] = useState(demoArenaView);
   const [chatText, setChatText] = useState("");
@@ -174,10 +176,11 @@ export default function Home() {
 
     <section className="bidbar glass">
       <div className="bid-caption"><span>Seu próximo lance</span><small>mínimo {formatCents(arenaView.nextBidCents)}</small></div>
-      <div className="stepper"><button onClick={() => setOffer(Math.max(arenaView.nextBidCents, offer - 2000))} aria-label="Diminuir"><Minus/></button><b>{formatCents(offer)}</b><button onClick={() => setOffer(offer + 2000)} aria-label="Aumentar"><Plus/></button></div>
+      <div className="stepper"><button onClick={() => setOffer(Math.max(arenaView.nextBidCents, offer - arenaView.incrementCents))} aria-label="Diminuir"><Minus/></button><button className="offer-explain" onClick={() => setOutcomeOpen(true)} aria-label="Entender o que acontece com este lance">{formatCents(offer)}</button><button onClick={() => setOffer(offer + arenaView.incrementCents)} aria-label="Aumentar"><Plus/></button></div>
       <button className="lime-button" disabled={remaining !== "00:00:00"} onClick={() => setOpen(true)}>{remaining !== "00:00:00" ? "TOPO PROTEGIDO" : "ASSUMIR A TELA"} <ArrowUpRight/></button>
     </section>
 
-    <BidCheckoutDialog open={open} onOpenChange={setOpen} amountCents={offer} nickname={playerNickname} defaultPostUrl={arenaView.featured.url} onApproved={() => { setOpen(false); void refreshArena(); }} />
+    <BidCheckoutDialog open={open} onOpenChange={setOpen} amountCents={offer} nickname={playerNickname} defaultPostUrl={arenaView.featured.url} baseBidCents={arenaView.baseBidCents} incrementCents={arenaView.incrementCents} rules={arenaView.protectionRules} onApproved={() => { setOpen(false); void refreshArena(); }} />
+    <BidOutcomeDialog open={outcomeOpen} onOpenChange={setOutcomeOpen} amountCents={offer} onAmountChange={setOffer} minimumCents={arenaView.nextBidCents} baseBidCents={arenaView.baseBidCents} incrementCents={arenaView.incrementCents} rules={arenaView.protectionRules} />
   </main>;
 }

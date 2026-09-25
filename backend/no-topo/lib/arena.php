@@ -4,6 +4,8 @@ declare(strict_types=1);
 const NO_TOPO_BASE_BID_CENTS = 2000;
 const NO_TOPO_INCREMENT_CENTS = 2000;
 const NO_TOPO_PROTECTION_SECONDS = 600;
+const NO_TOPO_PROTECTION_INCREMENT_SECONDS = 120;
+const NO_TOPO_MAX_PROTECTION_SECONDS = 3600;
 const NO_TOPO_RESERVATION_SECONDS = 300;
 
 function no_topo_utc(DateTimeImmutable $date): string
@@ -13,15 +15,10 @@ function no_topo_utc(DateTimeImmutable $date): string
 
 function no_topo_cycle(DateTimeImmutable $now): array
 {
-    $zone = new DateTimeZone('America/Sao_Paulo');
-    $local = $now->setTimezone($zone);
-    $start = $local->setTime(0, 0, 0);
-    $end = $start->modify('+1 day');
-
     return [
-        'id' => $start->format('Y-m-d'),
-        'startsAt' => no_topo_utc($start),
-        'endsAt' => no_topo_utc($end),
+        'id' => 'continuous-v1',
+        'startsAt' => no_topo_utc($now),
+        'endsAt' => null,
     ];
 }
 
@@ -41,20 +38,13 @@ function no_topo_empty_state(DateTimeImmutable $now): array
 
 function no_topo_current_state(array $state, DateTimeImmutable $now): array
 {
-    $cycle = no_topo_cycle($now);
-    if (($state['cycle']['id'] ?? null) === $cycle['id']) {
-        return $state;
+    if (!$state) {
+        return no_topo_empty_state($now);
     }
-
-    $fresh = no_topo_empty_state($now);
-    $fresh['history'] = $state['history'] ?? [];
-    if (!empty($state['ranking'])) {
-        $fresh['history'][] = [
-            'cycle' => $state['cycle'] ?? null,
-            'ranking' => $state['ranking'],
-        ];
+    if (($state['cycle']['id'] ?? null) !== 'continuous-v1') {
+        $state['cycle'] = no_topo_cycle($now);
     }
-    return $fresh;
+    return $state;
 }
 
 function no_topo_parse_time(?string $value): ?DateTimeImmutable
@@ -72,9 +62,16 @@ function no_topo_parse_time(?string $value): ?DateTimeImmutable
 function no_topo_next_bid(array $state, DateTimeImmutable $now): int
 {
     $state = no_topo_current_state($state, $now);
+    $base = (int) ($state['baseBidCents'] ?? NO_TOPO_BASE_BID_CENTS);
+    $increment = (int) ($state['incrementCents'] ?? NO_TOPO_INCREMENT_CENTS);
+    $leader = $state['ranking'][0] ?? null;
     $highest = 0;
-    foreach ($state['ranking'] ?? [] as $entry) {
-        $highest = max($highest, (int) ($entry['amountCents'] ?? 0));
+    if ($leader) {
+        $protectedUntil = no_topo_parse_time($leader['protectedUntil'] ?? null);
+        $hoursOpen = $protectedUntil && $protectedUntil < $now
+            ? intdiv(max(0, $now->getTimestamp() - $protectedUntil->getTimestamp()), 3600)
+            : 0;
+        $highest = max($base - $increment, (int) ($leader['amountCents'] ?? 0) - ($hoursOpen * $increment));
     }
     foreach ($state['reservations'] ?? [] as $reservation) {
         $expires = no_topo_parse_time($reservation['expiresAt'] ?? null);
@@ -83,9 +80,13 @@ function no_topo_next_bid(array $state, DateTimeImmutable $now): int
         }
     }
 
-    return $highest === 0
-        ? (int) ($state['baseBidCents'] ?? NO_TOPO_BASE_BID_CENTS)
-        : $highest + (int) ($state['incrementCents'] ?? NO_TOPO_INCREMENT_CENTS);
+    return $highest === 0 ? $base : max($base, $highest + $increment);
+}
+
+function no_topo_protection_seconds_for_bid(int $amountCents): int
+{
+    $increments = max(0, intdiv(max(0, $amountCents - NO_TOPO_BASE_BID_CENTS), NO_TOPO_INCREMENT_CENTS));
+    return min(NO_TOPO_MAX_PROTECTION_SECONDS, NO_TOPO_PROTECTION_SECONDS + ($increments * NO_TOPO_PROTECTION_INCREMENT_SECONDS));
 }
 
 function no_topo_normalize_instagram_url(string $url): array
@@ -134,6 +135,7 @@ function no_topo_reserve(array $state, array $input, DateTimeImmutable $now): ar
         'status' => 'reserved',
         'nickname' => trim((string) ($input['nickname'] ?? '')),
         'email' => strtolower(trim((string) ($input['email'] ?? ''))),
+        'bidderKey' => hash('sha256', strtolower(trim((string) ($input['email'] ?? '')))),
         'postUrl' => $instagram['url'],
         'shortcode' => $instagram['shortcode'],
         'amountCents' => $amount,
@@ -167,18 +169,38 @@ function no_topo_approve(array $state, string $reservationId, string $providerId
     $state['reservations'][$reservationId]['status'] = 'approved';
     $state['reservations'][$reservationId]['providerId'] = $providerId;
     $state['reservations'][$reservationId]['approvedAt'] = no_topo_utc($now);
+    $bidderKey = (string) ($reservation['bidderKey'] ?? hash('sha256', strtolower(trim((string) ($reservation['email'] ?? '')))));
+    $shortcode = (string) ($reservation['shortcode'] ?? '');
+    $sameLeader = isset($state['ranking'][0]) && (
+        (($state['ranking'][0]['bidderKey'] ?? null) === $bidderKey)
+        || (($state['ranking'][0]['shortcode'] ?? null) === $shortcode)
+    );
+    if (isset($state['ranking'][0]) && !$sameLeader && !isset($state['ranking'][0]['endedAt'])) {
+        $approvedAt = no_topo_parse_time($state['ranking'][0]['approvedAt'] ?? null);
+        $state['ranking'][0]['endedAt'] = no_topo_utc($now);
+        $state['ranking'][0]['durationSeconds'] = $approvedAt ? max(0, $now->getTimestamp() - $approvedAt->getTimestamp()) : 0;
+    }
+    $previousSelf = null;
+    $state['ranking'] = array_values(array_filter($state['ranking'] ?? [], static function (array $entry) use ($bidderKey, $shortcode, &$previousSelf): bool {
+        $matches = (($entry['bidderKey'] ?? null) === $bidderKey) || (($entry['shortcode'] ?? null) === $shortcode);
+        if ($matches && $previousSelf === null) {
+            $previousSelf = $entry;
+        }
+        return !$matches;
+    }));
+    $protectionEndsAt = $now->modify('+' . no_topo_protection_seconds_for_bid((int) $reservation['amountCents']) . ' seconds');
     $entry = [
         'reservationId' => $reservationId,
         'providerId' => $providerId,
         'nickname' => $reservation['nickname'],
+        'bidderKey' => $bidderKey,
         'postUrl' => $reservation['postUrl'],
         'shortcode' => $reservation['shortcode'],
         'amountCents' => $reservation['amountCents'],
-        'approvedAt' => no_topo_utc($now),
-        'protectedUntil' => no_topo_utc($now->modify('+' . (int) $state['protectionSeconds'] . ' seconds')),
+        'approvedAt' => $sameLeader && isset($previousSelf['approvedAt']) ? $previousSelf['approvedAt'] : no_topo_utc($now),
+        'protectedUntil' => no_topo_utc($protectionEndsAt),
     ];
-    $state['ranking'][] = $entry;
-    usort($state['ranking'], static fn (array $a, array $b): int => $b['amountCents'] <=> $a['amountCents']);
+    array_unshift($state['ranking'], $entry);
 
     return $state;
 }

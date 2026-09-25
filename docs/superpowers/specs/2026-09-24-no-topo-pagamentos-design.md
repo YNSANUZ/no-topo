@@ -2,17 +2,19 @@
 
 ## Objetivo
 
-Transformar o lance demonstrativo do No Topo em uma compra real. Um pagamento aprovado que supere o primeiro lugar coloca imediatamente a publicação do comprador no telão, respeitando um período mínimo de exposição e um ciclo diário de preços.
+Transformar o lance demonstrativo do No Topo em uma compra real. Um pagamento aprovado que alcance o mínimo vigente coloca imediatamente a publicação do comprador no telão, respeitando uma proteção proporcional ao valor e uma disputa contínua.
 
 ## Regras do produto
 
-- O ciclo reinicia todos os dias à meia-noite no fuso `America/Sao_Paulo`.
-- O primeiro lance de cada ciclo parte de um valor-base configurável; inicialmente, R$ 20,00.
-- Depois do primeiro pagamento aprovado, todo novo lance deve superar o maior valor aprovado em pelo menos R$ 20,00.
-- Um vencedor aprovado recebe dez minutos de exposição protegida. Durante esse período, o backend não cria novos pagamentos para ultrapassá-lo.
-- Encerrada a proteção, um pagamento maior pode assumir o telão imediatamente.
-- O vencedor anterior passa para o segundo lugar e o antigo segundo passa para o terceiro. Os demais continuam no histórico público do ciclo.
-- À meia-noite, primeiro, segundo e terceiro lugares são arquivados no histórico; o valor volta à base e começa um novo ciclo.
+- A disputa é contínua e não reinicia à meia-noite.
+- O lance mínimo parte de R$ 20,00.
+- R$ 20,00 garantem dez minutos de proteção; cada R$ 20,00 adicional acrescenta dois minutos, até o limite de sessenta minutos protegidos.
+- Durante a proteção, o backend não cria novos pagamentos para ultrapassar o líder.
+- Encerrada a proteção, o destaque continua no telão, mas já pode ser substituído.
+- O próximo mínimo começa um incremento de R$ 20,00 acima do lance vencedor. Após o fim da proteção, esse mínimo cai R$ 20,00 por hora completa até voltar ao piso de R$ 20,00.
+- Valores acima do necessário para sessenta minutos não aumentam a proteção, mas elevam a barreira inicial a ser coberta.
+- O vencedor anterior passa para o segundo lugar e o antigo segundo passa para o terceiro. Uma mesma pessoa ou uma mesma publicação ocupa somente uma posição: ao vencer novamente, sua posição anterior é removida antes de voltar ao primeiro lugar.
+- Segundo e terceiro lugares são conquistas anteriores distintas e não podem ser comprados diretamente.
 - Somente a confirmação do Mercado Pago, verificada pelo backend, altera o ranking. O retorno do navegador nunca é suficiente.
 
 ## Arquitetura
@@ -23,13 +25,13 @@ O frontend carregará o Mercado Pago Payment Brick com a mesma Public Key públi
 
 ## Fluxo de compra
 
-1. O frontend consulta o estado atual do ciclo e recebe o maior valor, incremento mínimo, ranking, término do ciclo e eventual proteção ativa.
+1. O frontend consulta o estado contínuo e recebe valor-base, incremento, próximo mínimo, regras de proteção, ranking e eventual proteção ativa.
 2. O visitante informa apelido, e-mail e URL de uma publicação pública do Instagram.
 3. O frontend envia o valor pretendido para criar uma reserva de lance.
 4. Em transação atômica, o backend rejeita valores abaixo do mínimo, períodos protegidos e tentativas duplicadas. Uma reserva válida dura cinco minutos.
 5. O Payment Brick oferece Pix, cartão e boleto usando o mesmo provedor do Ursoninhos.
 6. Antes de enviar a cobrança ao Mercado Pago, o backend confirma que a reserva ainda é válida e é a maior reserva ativa.
-7. O webhook consulta o pagamento diretamente no Mercado Pago. Quando o estado confirmado for `approved`, o backend promove o lance ao primeiro lugar e inicia dez minutos de proteção.
+7. O webhook consulta o pagamento diretamente no Mercado Pago. Quando o estado confirmado for `approved`, o backend promove o lance ao primeiro lugar e inicia a proteção calculada para o valor pago.
 8. O frontend acompanha o resultado e atualiza telão, ranking e cronômetro por consulta periódica. A primeira versão não exige WebSocket.
 
 ## Concorrência e idempotência
@@ -43,7 +45,7 @@ O frontend carregará o Mercado Pago Payment Brick com a mesma Public Key públi
 
 ## Dados
 
-Cada ciclo armazena identificador, início, término, valor-base e estado. Cada lance armazena identificador, ciclo, apelido, e-mail normalizado, URL e código da publicação, valor em centavos, estado da reserva, identificadores do Mercado Pago, horários, posição e período protegido. O histórico público nunca expõe e-mail, CPF, token ou dados do meio de pagamento.
+O estado contínuo armazena identificador de versão, início, valor-base e regras. Cada lance armazena identificador, apelido, identificador irreversível do comprador, URL e código da publicação, valor em centavos, estado da reserva, identificadores do Mercado Pago, horários, posição e período protegido. O histórico público nunca expõe e-mail, CPF, token ou dados do meio de pagamento.
 
 Os dados financeiros e os dados do Ursoninhos permanecem preservados. O novo sistema usa arquivos ou tabelas próprios, com backup antes da implantação e gravação atômica.
 
@@ -72,11 +74,11 @@ O modal atual deixa de dizer “simulação” e passa a mostrar:
 - Payment Brick do Mercado Pago;
 - estados de carregamento, Pix pendente, aprovado, rejeitado, expirado e ultrapassado antes da cobrança.
 
-Durante a proteção de dez minutos, os botões de compra ficam desabilitados e mostram quando novos lances serão liberados. O chat e a navegação 3D continuam funcionando.
+Durante a proteção, os botões de compra ficam desabilitados e mostram quando novos lances serão liberados. Tocar no valor abre uma simulação explícita do tempo protegido, do próximo mínimo e da queda horária posterior. Valores altos ficam recolhidos sob “Pagar mais”. O chat e a navegação 3D continuam funcionando.
 
 ## Placa explicativa
 
-Uma placa iluminada próxima à entrada do coliseu explica a mecânica sem competir visualmente com o telão. Ela mostra os cinco pontos essenciais: superar o lance atual, aprovação do pagamento, proteção de dez minutos, possibilidade de ser ultrapassado depois da proteção e reset diário para R$ 20,00. A última linha usa os valores recebidos da API para exibir lance atual e próximo mínimo.
+Uma placa iluminada próxima à entrada do coliseu explica a mecânica sem competir visualmente com o telão. Ela mostra os pontos essenciais: alcançar o mínimo vigente, aprovação do pagamento, proteção proporcional limitada a uma hora, permanência do conteúdo após a proteção e queda horária do próximo mínimo até R$ 20,00. A última linha usa os valores recebidos da API para exibir lance atual e próximo mínimo.
 
 No celular, tocar na placa abre um painel HTML legível com o mesmo conteúdo. A placa 3D não recebe texto financeiro estático: valores vêm sempre do estado confirmado pelo servidor.
 
@@ -118,7 +120,7 @@ Uma placa clicável chamada “HALL DA FAMA” dentro do cenário abre `https://
 
 Cada entrada pública contém posição, apelido, link ou miniatura permitida da publicação, tempo acumulado no telão, quantidade de conquistas, maior lance e última aparição. E-mail, CPF, forma de pagamento, identificadores financeiros e detalhes de transação nunca aparecem.
 
-O tempo contabilizado de uma conquista começa na aprovação e termina quando outro vencedor assume ou quando o ciclo é encerrado à meia-noite. A API calcula esse tempo no servidor, incluindo o intervalo ainda em andamento do primeiro lugar atual. Apelidos iguais não são fundidos sem uma identidade pública estável; na primeira versão, cada e-mail normalizado recebe um identificador público irreversível produzido por HMAC no servidor.
+O tempo contabilizado de uma conquista começa na aprovação e termina quando outro vencedor assume. A API calcula esse tempo no servidor, incluindo o intervalo ainda em andamento do primeiro lugar atual. Apelidos iguais não são fundidos sem uma identidade estável; na primeira versão, cada e-mail normalizado recebe um identificador irreversível mantido somente nos dados privados do servidor.
 
 ## Vídeo compartilhável da conquista
 
@@ -144,14 +146,14 @@ Nenhum vídeo é enviado ao servidor na primeira versão. Isso elimina custo de 
 
 ## Testes e implantação
 
-- Testes unitários cobrem ciclo diário, incremento, proteção, expiração, URL do Instagram, idempotência e transições de ranking.
+- Testes unitários cobrem disputa contínua, incremento, proteção proporcional e seu limite, queda horária do mínimo, URL do Instagram, idempotência e transições sem duplicidade no pódio.
 - Testes de integração simulam respostas do Mercado Pago sem realizar cobrança real.
 - O ambiente de produção será validado inicialmente com um lance de valor mínimo controlado.
 - Antes de publicar PHP, serão criados backup datado e hashes dos arquivos compartilhados do Ursoninhos.
 - O frontend só será publicado após a API responder corretamente às origens do No Topo.
 - O rollback remove a chamada ao checkout do frontend e restaura os arquivos PHP pelo backup, sem alterar pedidos do Ursoninhos.
 - Testes de interface cobrem anúncio único por sessão, evento único por conquista, silêncio, redução de movimento, abertura segura do Hall da Fama e fallback MP4/WebM.
-- Testes do ranking cobrem encerramento do tempo ao ser ultrapassado, corte à meia-noite, agregação por identificador público e ausência de dados privados.
+- Testes do ranking cobrem encerramento do tempo ao ser ultrapassado, retorno de um vencedor sem duplicidade, unicidade de publicação e ausência de dados privados.
 - A captura será testada em Chrome desktop e Android; navegadores sem `captureStream`, `MediaRecorder` ou compartilhamento de arquivos recebem apenas o botão de copiar link.
 
 ## Fora do primeiro lançamento

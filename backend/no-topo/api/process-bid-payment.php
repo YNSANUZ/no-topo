@@ -25,6 +25,13 @@ if (!defined('NO_TOPO_TESTING')) {
             if (!$expiresAt || $expiresAt <= $now) {
                 throw new DomainException('Reserva expirada.', 409);
             }
+            if (($reservation['status'] ?? null) !== 'reserved') {
+                throw new DomainException('Reserva indisponivel.', 409);
+            }
+            $minimum = no_topo_next_bid($state, $now);
+            if ((int) ($reservation['amountCents'] ?? 0) < $minimum) {
+                throw new DomainException('Este lance foi superado antes da cobranca. Atualize o valor.', 409);
+            }
             return ['state' => $state, 'result' => $reservation];
         });
 
