@@ -8,6 +8,7 @@ import { moderateMessage } from "@/lib/chat-moderation.mjs";
 import { createVisitorNickname, normalizeNickname } from "@/lib/player-identity.mjs";
 import { fetchArenaState, formatCents } from "@/lib/no-topo-api.mjs";
 import { arenaViewFromState, demoArenaView } from "@/lib/live-arena.mjs";
+import { buildArenaTicker } from "@/lib/arena-ticker.mjs";
 
 const Arena = dynamic(() => import("@/components/arena-3d"), { ssr: false });
 export default function Home() {
@@ -155,6 +156,10 @@ export default function Home() {
       <button type="submit" aria-label="Enviar mensagem"><Send size={17}/></button>
       {chatError && <span id="chat-error" className="chat-error" role="alert">{chatError}</span>}
     </form>
+    </div>
+
+    <div className="arena-ticker" aria-label="Informações da disputa">
+      <span>{buildArenaTicker(arenaView)}</span>
     </div>
 
     <section className="bidbar glass">
