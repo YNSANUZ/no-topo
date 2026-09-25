@@ -9,6 +9,7 @@ import { createVisitorNickname, normalizeNickname } from "@/lib/player-identity.
 import { fetchArenaState, formatCents } from "@/lib/no-topo-api.mjs";
 import { arenaViewFromState, demoArenaView } from "@/lib/live-arena.mjs";
 import { buildArenaTicker } from "@/lib/arena-ticker.mjs";
+import { roomGuideReply } from "@/lib/room-guide.mjs";
 
 const Arena = dynamic(() => import("@/components/arena-3d"), { ssr: false });
 export default function Home() {
@@ -26,6 +27,7 @@ export default function Home() {
   const [chatMessages, setChatMessages] = useState<Array<{ id: number; text: string; nickname: string; color: string }>>([]);
   const [chatError, setChatError] = useState("");
   const chatInputRef = useRef<HTMLInputElement>(null);
+  const guideReplyTimer = useRef<number | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -90,7 +92,15 @@ export default function Home() {
   const publishMessage = useCallback((text: string) => {
     const message = { id: Date.now(), text, nickname: playerNickname, color: playerColor };
     setChatMessages((current) => [...current.slice(-3), message]);
+    if (guideReplyTimer.current) window.clearTimeout(guideReplyTimer.current);
+    guideReplyTimer.current = window.setTimeout(() => {
+      const reply = { id: Date.now() + 1, text: roomGuideReply(text), nickname: "Guia da sala", color: "#78d7ff" };
+      setChatMessages((current) => [...current.slice(-3), reply]);
+      guideReplyTimer.current = null;
+    }, 1800 + Math.floor(Math.random() * 2400));
   }, [playerNickname]);
+
+  useEffect(() => () => { if (guideReplyTimer.current) window.clearTimeout(guideReplyTimer.current); }, []);
 
   return <main className="app-shell">
     <Arena countdown={remaining} featured={arenaView.featured} podium={arenaView.podium} playerNickname={playerNickname} onboarding={onboarding} onQuickMessage={publishMessage} onNicknameRequest={openNickname} onPlayerLocated={dismissOnboarding} />

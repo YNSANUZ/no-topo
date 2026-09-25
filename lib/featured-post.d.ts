@@ -8,3 +8,4 @@ export const featuredPost: Readonly<{
 }>;
 
 export function instagramEmbedUrl(shortcode: string): string;
+export function instagramPreviewUrl(shortcode: string): string;

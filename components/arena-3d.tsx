@@ -7,7 +7,7 @@ import { CSS3DObject, CSS3DRenderer } from "three/examples/jsm/renderers/CSS3DRe
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { advanceToward, clampArenaTarget, createPerimeterLights, createSeatLayout, entranceLayout, getCameraView, getNpcMotion, getSeatedCharacterRotation } from "../lib/arena-layout.mjs";
-import { instagramEmbedUrl } from "../lib/featured-post.mjs";
+import { instagramPreviewUrl } from "../lib/featured-post.mjs";
 import type { ArenaFeatured } from "../lib/live-arena.mjs";
 
 const LIME = 0xb9ff38;
@@ -64,29 +64,19 @@ function makeLabel(text: string) {
 function makeInstagramScreen(countdown: string, featured: ArenaFeatured) {
   const panel = document.createElement("div");
   panel.className = "instagram-screen";
-  if (!featured.embedAvailable) {
-    const fallback = document.createElement("a");
-    fallback.className = "instagram-fallback";
-    fallback.href = featured.url;
-    fallback.target = "_blank";
-    fallback.rel = "noreferrer";
-    const badge = document.createElement("span"); badge.textContent = "INSTAGRAM REEL";
-    const handle = document.createElement("strong"); handle.textContent = featured.username;
-    const note = document.createElement("small"); note.textContent = "Conteúdo restrito • abrir no Instagram ↗";
-    fallback.append(badge, handle, note); panel.appendChild(fallback);
-    return new CSS3DObject(panel);
-  }
   const header = document.createElement("div"); header.className = "screen-header"; header.innerHTML = `<b>DESTAQUE ATUAL</b><span>• ${featured.username}</span>`;
   const bid = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(featured.bid / 100);
   const left = document.createElement("div"); left.className = "screen-side screen-left"; left.innerHTML = `<small>LANCE ATUAL</small><strong>${bid}</strong><p>IDEIAS GANHAM<br/>MAIS VISTA</p>`;
   const right = document.createElement("div"); right.className = "screen-side screen-right"; right.innerHTML = `<strong>${countdown}</strong><p>MARCAS QUE CHEGAM<br/>MAIS LONGE</p>`;
-  const iframe = document.createElement("iframe");
-  iframe.src = instagramEmbedUrl(featured.shortcode);
-  iframe.title = `Reel em primeiro lugar de ${featured.username}`;
-  iframe.loading = "eager";
-  iframe.allow = "encrypted-media; fullscreen; picture-in-picture";
-  iframe.setAttribute("scrolling", "no");
-  panel.append(header, left, iframe, right);
+  const preview = document.createElement("a");
+  preview.className = "instagram-preview";
+  preview.href = featured.url; preview.target = "_blank"; preview.rel = "noreferrer";
+  preview.setAttribute("aria-label", `Assistir ao Reel de ${featured.username} no Instagram`);
+  const image = document.createElement("img"); image.src = instagramPreviewUrl(featured.shortcode); image.alt = `Capa do Reel de ${featured.username}`;
+  const play = document.createElement("span"); play.textContent = "▶";
+  const note = document.createElement("small"); note.textContent = "ASSISTIR AO REEL";
+  preview.append(image, play, note);
+  panel.append(header, left, preview, right);
   return new CSS3DObject(panel);
 }
 
@@ -255,7 +245,18 @@ export default function Arena3D({ countdown, featured, podium, playerNickname, o
       face.position.z = .18; poster.add(frame, face); scene.add(poster);
     });
 
-    const animatedPeople: Array<{ object: THREE.Object3D; baseY: number; phase: number; kind: "walking" | "seated" }> = [];
+    const openSeats = seatPlacements.filter((_, index) => index % 2 !== 0 && index % 5 !== 0);
+    type RoamingNpc = {
+      mode: "walking" | "idle" | "seated";
+      target: THREE.Vector3;
+      destinationSeat: boolean;
+      seatRotation: number;
+      nextAt: number;
+      walkAction?: THREE.AnimationAction;
+      idleAction?: THREE.AnimationAction;
+      sitAction?: THREE.AnimationAction;
+    };
+    const animatedPeople: Array<{ object: THREE.Object3D; baseY: number; phase: number; kind: "walking" | "seated"; roaming?: RoamingNpc }> = [];
     const mixers: THREE.AnimationMixer[] = [];
     const playerState = { target: new THREE.Vector3(0, .1, 15.2), sitting: false, targetRotation: Math.PI };
     let playerHalo: THREE.Mesh | null = null;
@@ -288,10 +289,25 @@ export default function Arena3D({ countdown, featured, podium, playerNickname, o
         person.traverse((o) => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).castShadow = true; });
         const mixer = new THREE.AnimationMixer(person);
         const walkClip = THREE.AnimationClip.findByName(source.animations, "walk");
-        if (walkClip) mixer.clipAction(walkClip).play();
+        const idleClip = THREE.AnimationClip.findByName(source.animations, "idle");
+        const sitClip = THREE.AnimationClip.findByName(source.animations, "sit");
+        const walkAction = walkClip ? mixer.clipAction(walkClip) : undefined;
+        const idleAction = idleClip ? mixer.clipAction(idleClip) : undefined;
+        const sitAction = sitClip ? mixer.clipAction(sitClip) : undefined;
+        walkAction?.play();
         mixers.push(mixer);
+        const startAngle = index * 1.21;
+        person.position.set(Math.sin(startAngle) * 7.8, .1, Math.cos(startAngle) * 7.8);
         scene.add(person);
-        animatedPeople.push({ object: person, baseY: .1, phase: index * 1.3, kind: "walking" });
+        animatedPeople.push({
+          object: person, baseY: .1, phase: index * 1.3, kind: "walking",
+          roaming: {
+            mode: "walking",
+            target: new THREE.Vector3(Math.sin(startAngle + 1.4) * (5 + index * .45), .1, Math.cos(startAngle + 1.4) * (5 + index * .45)),
+            destinationSeat: false, seatRotation: 0, nextAt: 2.5 + index * 2.3,
+            walkAction, idleAction, sitAction,
+          },
+        });
       }
 
       const playerSource = models[5];
@@ -369,13 +385,37 @@ export default function Arena3D({ countdown, featured, podium, playerNickname, o
         rim.material.opacity = .75 + Math.sin(t * 2) * .2;
         rim.material.transparent = true;
       }
+      const playNpcAction = (npc: RoamingNpc, action: THREE.AnimationAction | undefined) => {
+        npc.walkAction?.fadeOut(.18); npc.idleAction?.fadeOut(.18); npc.sitAction?.fadeOut(.18);
+        action?.reset().fadeIn(.18).play();
+      };
       for (const person of animatedPeople) {
         const motion = getNpcMotion(person.kind, t, person.phase);
-        if (person.kind === "walking") {
-          const angle = motion.progress * Math.PI * 2;
-          const radius = 8.15;
-          person.object.position.set(Math.sin(angle) * radius, person.baseY + motion.bob, Math.cos(angle) * radius);
-          person.object.rotation.set(0, angle + Math.PI / 2, motion.sway);
+        const npc = person.roaming;
+        if (npc?.mode === "walking") {
+          const next = advanceToward({ x: person.object.position.x, z: person.object.position.z }, { x: npc.target.x, z: npc.target.z }, delta * .82);
+          const dx = next.x - person.object.position.x; const dz = next.z - person.object.position.z;
+          person.object.position.set(next.x, npc.target.y + motion.bob, next.z);
+          if (!next.arrived) person.object.rotation.y = Math.atan2(dx, dz);
+          if (next.arrived) {
+            if (npc.destinationSeat) {
+              npc.mode = "seated"; person.kind = "seated"; person.object.position.y = npc.target.y;
+              person.object.rotation.y = getSeatedCharacterRotation(npc.seatRotation);
+              playNpcAction(npc, npc.sitAction); npc.nextAt = t + 9 + Math.random() * 18;
+            } else {
+              npc.mode = "idle"; playNpcAction(npc, npc.idleAction); npc.nextAt = t + 3 + Math.random() * 9;
+            }
+          }
+        } else if (npc && t >= npc.nextAt) {
+          const chooseSeat = npc.mode !== "seated" && Math.random() < .48;
+          if (chooseSeat) {
+            const seat = openSeats[Math.floor(Math.random() * openSeats.length)];
+            npc.target.copy(seat.position); npc.seatRotation = seat.rotationY; npc.destinationSeat = true;
+          } else {
+            const angle = Math.random() * Math.PI * 2; const radius = 3.8 + Math.random() * 4.8;
+            npc.target.set(Math.sin(angle) * radius, .1, Math.cos(angle) * radius); npc.destinationSeat = false;
+          }
+          npc.mode = "walking"; person.kind = "walking"; playNpcAction(npc, npc.walkAction);
         }
       }
       const player = playerRef.current;
