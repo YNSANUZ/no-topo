@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Minus, Plus, Send } from "lucide-react";
 import BidCheckoutDialog from "@/components/bid-checkout-dialog";
 import BidOutcomeDialog from "@/components/bid-outcome-dialog";
+import RulesDialog from "@/components/rules-dialog";
 import { moderateMessage } from "@/lib/chat-moderation.mjs";
 import { createVisitorNickname, normalizeNickname } from "@/lib/player-identity.mjs";
 import { fetchArenaState, formatCents } from "@/lib/no-topo-api.mjs";
@@ -17,6 +18,7 @@ export default function Home() {
   const [offer, setOffer] = useState(2000);
   const [open, setOpen] = useState(false);
   const [outcomeOpen, setOutcomeOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [remaining, setRemaining] = useState("00:00:00");
   const [arenaView, setArenaView] = useState(demoArenaView);
   const [chatText, setChatText] = useState("");
@@ -113,7 +115,7 @@ export default function Home() {
     <div className="vignette" />
     <header className="topbar glass">
       <a className="brand" href="#" aria-label="No Topo"><span className="brand-mark">↗</span><b>NO TOPO</b></a>
-      <nav><a href="#como">Como funciona</a><a href="#ranking">Ranking</a><a href="#recordes">Recordes</a></nav>
+      <nav><button type="button" onClick={() => setRulesOpen(true)}>Como funciona</button><a href="#ranking">Ranking</a><a href="#recordes">Recordes</a></nav>
       <div className="live"><span /> 127 ONLINE</div>
       <button className="lime-button small" disabled={remaining !== "00:00:00"} onClick={openCheckout}>DAR UM LANCE</button>
     </header>
@@ -132,7 +134,7 @@ export default function Home() {
 
     {nicknameOpen && <div className="nickname-card glass" role="dialog" aria-modal="true" aria-labelledby="nickname-title">
       <strong id="nickname-title">Escolha seu apelido</strong>
-      <small>Os outros visitantes verão este nome.</small>
+      <small>Os outros visitantes verão este nome. Você poderá trocá-lo depois clicando no seu boneco.</small>
       <form onSubmit={(event) => {
         event.preventDefault();
         const result = normalizeNickname(nicknameDraft, playerNickname);
@@ -186,5 +188,6 @@ export default function Home() {
 
     <BidCheckoutDialog open={open} onOpenChange={setOpen} amountCents={offer} onAmountChange={setOffer} minimumCents={arenaView.nextBidCents} nickname={playerNickname} defaultPostUrl={arenaView.featured.url} baseBidCents={arenaView.baseBidCents} incrementCents={arenaView.incrementCents} rules={arenaView.protectionRules} onApproved={() => { setOpen(false); void refreshArena(); }} />
     <BidOutcomeDialog open={outcomeOpen} onOpenChange={setOutcomeOpen} amountCents={offer} onAmountChange={setOffer} minimumCents={arenaView.nextBidCents} baseBidCents={arenaView.baseBidCents} incrementCents={arenaView.incrementCents} rules={arenaView.protectionRules} />
+    <RulesDialog open={rulesOpen} onOpenChange={setRulesOpen} username={arenaView.featured.username} winningBidCents={arenaView.featured.bid} nextBidCents={arenaView.nextBidCents} incrementCents={arenaView.incrementCents} protectionActive={remaining !== "00:00:00"} />
   </main>;
 }

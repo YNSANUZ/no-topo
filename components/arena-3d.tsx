@@ -356,6 +356,7 @@ export default function Arena3D({ countdown, featured, podium, playerNickname, o
       const menuElement = document.createElement("div"); menuElement.className = "avatar-actions";
       const danceButton = document.createElement("button"); danceButton.type = "button"; danceButton.textContent = "Dançar";
       const waveButton = document.createElement("button"); waveButton.type = "button"; waveButton.textContent = "Dar oi";
+      const nicknameButton = document.createElement("button"); nicknameButton.type = "button"; nicknameButton.textContent = "Trocar apelido";
       danceButton.addEventListener("click", (event) => {
         event.stopPropagation();
         playerState.danceEnabled = !playerState.danceEnabled;
@@ -363,7 +364,8 @@ export default function Arena3D({ countdown, featured, podium, playerNickname, o
         if (playerMovementMode !== "walk") playPlayerAction(playerState.danceEnabled ? "dance" : "idle");
       });
       waveButton.addEventListener("click", (event) => { event.stopPropagation(); playPlayerAction("wave"); onQuickMessage("Oi!"); });
-      menuElement.append(danceButton, waveButton);
+      nicknameButton.addEventListener("click", (event) => { event.stopPropagation(); onNicknameRequest(); });
+      menuElement.append(danceButton, waveButton, nicknameButton);
       playerActionMenu = new CSS3DObject(menuElement); playerActionMenu.scale.setScalar(.01); playerActionMenu.visible = false; scene.add(playerActionMenu);
     }).catch(() => undefined);
 
