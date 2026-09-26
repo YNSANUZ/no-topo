@@ -6,6 +6,7 @@ import { ArrowUpRight, Minus, Plus, Send } from "lucide-react";
 import BidCheckoutDialog from "@/components/bid-checkout-dialog";
 import BidOutcomeDialog from "@/components/bid-outcome-dialog";
 import RulesDialog from "@/components/rules-dialog";
+import RecentConquests from "@/components/recent-conquests";
 import { moderateMessage } from "@/lib/chat-moderation.mjs";
 import { createVisitorNickname, normalizeNickname } from "@/lib/player-identity.mjs";
 import { fetchArenaState, formatCents } from "@/lib/no-topo-api.mjs";
@@ -120,13 +121,7 @@ export default function Home() {
       <button className="lime-button small" disabled={remaining !== "00:00:00"} onClick={openCheckout}>DAR UM LANCE</button>
     </header>
 
-    <section className="status-card glass" aria-label="Destaque atual">
-      <div className="eyebrow"><ArrowUpRight size={14}/> DESTAQUE ATUAL</div>
-      <strong>{arenaView.featured.username}</strong>
-      <div className="status-row"><span>Lance atual</span><b>{formatCents(arenaView.featured.bid)}</b></div>
-      <div className="status-row"><span>Proteção</span><b className="timer">{remaining}</b></div>
-      <a className="post-link" href={arenaView.featured.url} target="_blank" rel="noreferrer">VER REEL NO INSTAGRAM <ArrowUpRight size={13}/></a>
-    </section>
+    <RecentConquests entries={arenaView.recentConquests}/>
 
     <div className="hint glass"><ArrowUpRight size={18}/><span>clique para andar ou sentar</span><i/> <span>arraste para girar</span></div>
 
