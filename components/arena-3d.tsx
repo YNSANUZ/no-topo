@@ -7,7 +7,7 @@ import { CSS3DObject, CSS3DRenderer } from "three/examples/jsm/renderers/CSS3DRe
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { advanceToward, clampArenaTarget, createPerimeterLights, createSeatLayout, entranceLayout, getCameraView, getNpcMotion, getSeatedCharacterRotation } from "../lib/arena-layout.mjs";
-import { instagramPreviewUrl } from "../lib/featured-post.mjs";
+import { foundingPodium, instagramPreviewUrl } from "../lib/featured-post.mjs";
 import type { ArenaFeatured } from "../lib/live-arena.mjs";
 
 const LIME = 0xb9ff38;
@@ -44,9 +44,9 @@ function rankingPosterTexture(rank: string, username: string, bid: string, durat
   ctx.fillStyle = accent; ctx.font = "900 210px Arial"; ctx.fillText(rank, 300, 260);
   ctx.fillStyle = "#ffffff"; ctx.font = "900 58px Arial"; ctx.fillText(username, 300, 390, 540);
   ctx.fillStyle = "rgba(255,255,255,.58)"; ctx.font = "800 34px Arial"; ctx.fillText(founding ? "PERFIL FUNDADOR" : "LANCE APROVADO", 300, 610);
-  ctx.fillStyle = "#ffffff"; ctx.font = "900 72px Arial"; ctx.fillText(founding ? "CONVIDADO" : bid, 300, 700);
-  ctx.fillStyle = "rgba(255,255,255,.58)"; ctx.font = "800 30px Arial"; ctx.fillText(founding ? "POSIÇÃO INICIAL" : "TEMPO NO TOPO", 300, 790);
-  ctx.fillStyle = accent; ctx.font = "900 58px Arial"; ctx.fillText(founding ? "ATÉ NOVO LANCE" : duration, 300, 865);
+  ctx.fillStyle = "#ffffff"; ctx.font = "900 72px Arial"; ctx.fillText(bid, 300, 700);
+  ctx.fillStyle = "rgba(255,255,255,.58)"; ctx.font = "800 30px Arial"; ctx.fillText(founding ? "DESTAQUE FUNDADOR" : "TEMPO NO TOPO", 300, 790);
+  ctx.fillStyle = accent; ctx.font = "900 52px Arial"; ctx.fillText(founding ? "ATÉ NOVA CONQUISTA" : duration, 300, 865);
   ctx.fillRect(190, 915, 220, 14);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -238,14 +238,10 @@ export default function Arena3D({ countdown, featured, podium, playerNickname, o
       const casing = new THREE.Mesh(new THREE.BoxGeometry(.42, .28, .5), trussMat); casing.position.set(x, 8.45, .2); scene.add(casing);
     });
 
-    const fallbackPodium = [
-      { rank: 2, username: "@primusdf", bid: 0 },
-      { rank: 3, username: "@ursoninhos", bid: 0 },
-    ];
     const formatDuration = (seconds?: number | null) => seconds == null ? "AGUARDANDO" : seconds >= 3600 ? `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}min` : `${Math.max(1, Math.floor(seconds / 60))} min`;
-    const rankingPosters = [podium[1] || fallbackPodium[0], podium[2] || fallbackPodium[1]].map((entry, index) => ({
+    const rankingPosters = [podium[1] || foundingPodium[1], podium[2] || foundingPodium[2]].map((entry, index) => ({
       side: index === 0 ? -1 : 1, rank: `#${index + 2}`, username: entry.username,
-      bid: new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(entry.bid / 100), duration: formatDuration("durationSeconds" in entry ? entry.durationSeconds : null), accent: index === 0 ? "#b892ff" : "#ff7ce5", founding: !("durationSeconds" in entry),
+      bid: new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(entry.bid / 100), duration: formatDuration(entry.durationSeconds), accent: index === 0 ? "#b892ff" : "#ff7ce5", founding: Boolean(entry.founding),
     }));
     rankingPosters.forEach(({ side, rank, username, bid, duration, accent, founding }) => {
       const poster = new THREE.Group();

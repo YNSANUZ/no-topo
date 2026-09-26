@@ -6,7 +6,7 @@ import type { ArenaFeatured } from "@/lib/live-arena.mjs";
 import { formatCents } from "@/lib/no-topo-api.mjs";
 
 function timeLabel(entry: ArenaFeatured) {
-  if (entry.founding) return "Destaque inaugural";
+  if (entry.founding) return entry.rank === 1 ? "Destaque inaugural" : "Destaque fundador";
   if (!entry.approvedAt) return "Conquista aprovada";
   const elapsed = Math.max(0, Date.now() - new Date(entry.approvedAt).getTime());
   const minutes = Math.floor(elapsed / 60000);
