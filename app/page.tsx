@@ -30,6 +30,10 @@ export default function Home() {
   const [chatError, setChatError] = useState("");
   const chatInputRef = useRef<HTMLInputElement>(null);
   const guideReplyTimer = useRef<number | null>(null);
+  const openCheckout = useCallback(() => {
+    setOffer(arenaView.nextBidCents);
+    setOpen(true);
+  }, [arenaView.nextBidCents]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -111,7 +115,7 @@ export default function Home() {
       <a className="brand" href="#" aria-label="No Topo"><span className="brand-mark">↗</span><b>NO TOPO</b></a>
       <nav><a href="#como">Como funciona</a><a href="#ranking">Ranking</a><a href="#recordes">Recordes</a></nav>
       <div className="live"><span /> 127 ONLINE</div>
-      <button className="lime-button small" disabled={remaining !== "00:00:00"} onClick={() => setOpen(true)}>DAR UM LANCE</button>
+      <button className="lime-button small" disabled={remaining !== "00:00:00"} onClick={openCheckout}>DAR UM LANCE</button>
     </header>
 
     <section className="status-card glass" aria-label="Destaque atual">
@@ -177,10 +181,10 @@ export default function Home() {
     <section className="bidbar glass">
       <div className="bid-caption"><span>Seu próximo lance</span><small>mínimo {formatCents(arenaView.nextBidCents)}</small></div>
       <div className="stepper"><button onClick={() => setOffer(Math.max(arenaView.nextBidCents, offer - arenaView.incrementCents))} aria-label="Diminuir"><Minus/></button><button className="offer-explain" onClick={() => setOutcomeOpen(true)} aria-label="Entender o que acontece com este lance">{formatCents(offer)}</button><button onClick={() => setOffer(offer + arenaView.incrementCents)} aria-label="Aumentar"><Plus/></button></div>
-      <button className="lime-button" disabled={remaining !== "00:00:00"} onClick={() => setOpen(true)}>{remaining !== "00:00:00" ? "TOPO PROTEGIDO" : "ASSUMIR A TELA"} <ArrowUpRight/></button>
+      <button className="lime-button" disabled={remaining !== "00:00:00"} onClick={openCheckout}>{remaining !== "00:00:00" ? `PROTEGIDO POR ${remaining}` : `ASSUMIR A TELA POR ${formatCents(arenaView.nextBidCents)}`} <ArrowUpRight/></button>
     </section>
 
-    <BidCheckoutDialog open={open} onOpenChange={setOpen} amountCents={offer} nickname={playerNickname} defaultPostUrl={arenaView.featured.url} baseBidCents={arenaView.baseBidCents} incrementCents={arenaView.incrementCents} rules={arenaView.protectionRules} onApproved={() => { setOpen(false); void refreshArena(); }} />
+    <BidCheckoutDialog open={open} onOpenChange={setOpen} amountCents={offer} onAmountChange={setOffer} minimumCents={arenaView.nextBidCents} nickname={playerNickname} defaultPostUrl={arenaView.featured.url} baseBidCents={arenaView.baseBidCents} incrementCents={arenaView.incrementCents} rules={arenaView.protectionRules} onApproved={() => { setOpen(false); void refreshArena(); }} />
     <BidOutcomeDialog open={outcomeOpen} onOpenChange={setOutcomeOpen} amountCents={offer} onAmountChange={setOffer} minimumCents={arenaView.nextBidCents} baseBidCents={arenaView.baseBidCents} incrementCents={arenaView.incrementCents} rules={arenaView.protectionRules} />
   </main>;
 }

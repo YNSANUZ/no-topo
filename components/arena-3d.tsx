@@ -55,12 +55,18 @@ function rankingPosterTexture(rank: string, username: string, bid: string, durat
 }
 
 function makeLabel(text: string) {
-  const canvas = document.createElement("canvas"); canvas.width = 420; canvas.height = 96;
+  const canvas = document.createElement("canvas"); canvas.width = 1260; canvas.height = 288;
   const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = "rgba(5,9,18,.86)"; ctx.roundRect(4,4,412,88,24); ctx.fill();
-  ctx.strokeStyle = "rgba(185,255,56,.65)"; ctx.lineWidth = 3; ctx.stroke();
-  ctx.fillStyle = "white"; ctx.font = "700 34px Arial"; ctx.textAlign = "center"; ctx.fillText(text, 210, 61);
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, depthTest: false }));
+  ctx.fillStyle = "rgba(3,7,15,.96)"; ctx.roundRect(10,10,1240,268,68); ctx.fill();
+  ctx.strokeStyle = "rgba(185,255,56,.9)"; ctx.lineWidth = 9; ctx.stroke();
+  ctx.shadowColor = "rgba(0,0,0,.95)"; ctx.shadowBlur = 12; ctx.shadowOffsetY = 5;
+  ctx.fillStyle = "#ffffff"; ctx.font = "800 102px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(text, 630, 148, 1160);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false }));
   sprite.scale.set(2.7, .62, 1); return sprite;
 }
 
@@ -265,6 +271,10 @@ export default function Arena3D({ countdown, featured, podium, playerNickname, o
     const playerState = { target: new THREE.Vector3(0, .1, 15.2), sitting: false, targetRotation: Math.PI };
     let playerHalo: THREE.Mesh | null = null;
     let playerActionMenu: CSS3DObject | null = null;
+    let playerMovementMode: "idle" | "walk" = "idle";
+    let playPlayerMovement: ((name: "idle" | "walk") => void) | null = null;
+    let currentPlayerPose = "idle";
+    let danceEnabled = false;
     const loader = new GLTFLoader();
     Promise.all(modelPaths.map((path) => loader.loadAsync(path))).then((models) => {
       const occupied = seatPlacements.filter((_, i) => i % 2 === 0 || i % 5 === 0).slice(0, 72);
@@ -332,11 +342,14 @@ export default function Arena3D({ countdown, featured, podium, playerNickname, o
         if (!clip) return;
         currentPlayerAction?.fadeOut(.12);
         const action = playerMixer.clipAction(clip); action.reset(); action.enabled = true;
-        if (name !== "idle") { action.setLoop(THREE.LoopRepeat, name === "wave" ? 2 : 3); action.clampWhenFinished = true; }
-        action.fadeIn(.12).play(); currentPlayerAction = action;
+        if (name === "walk" || name === "dance") action.setLoop(THREE.LoopRepeat, Infinity);
+        else if (name !== "idle") { action.setLoop(THREE.LoopRepeat, name === "wave" ? 2 : 3); action.clampWhenFinished = true; }
+        action.timeScale = name === "dance" ? 1.35 : 1;
+        action.fadeIn(.12).play(); currentPlayerAction = action; currentPlayerPose = name;
       };
+      playPlayerMovement = (name) => { playerMovementMode = name; playPlayerAction(name); };
       if (idleClip) playPlayerAction("idle");
-      playerMixer.addEventListener("finished", () => playPlayerAction("idle"));
+      playerMixer.addEventListener("finished", () => playPlayerAction(danceEnabled ? "dance" : "idle"));
       mixers.push(playerMixer);
       playerHalo = new THREE.Mesh(new THREE.RingGeometry(.58, .78, 32), new THREE.MeshBasicMaterial({ color: LIME, transparent: true, opacity: .85, side: THREE.DoubleSide }));
       playerHalo.rotation.x = -Math.PI / 2; playerHalo.position.set(player.position.x, .08, player.position.z); scene.add(playerHalo);
@@ -345,7 +358,12 @@ export default function Arena3D({ countdown, featured, podium, playerNickname, o
       const menuElement = document.createElement("div"); menuElement.className = "avatar-actions";
       const danceButton = document.createElement("button"); danceButton.type = "button"; danceButton.textContent = "Dançar";
       const waveButton = document.createElement("button"); waveButton.type = "button"; waveButton.textContent = "Dar oi";
-      danceButton.addEventListener("click", (event) => { event.stopPropagation(); playPlayerAction("dance"); });
+      danceButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        danceEnabled = !danceEnabled;
+        danceButton.textContent = danceEnabled ? "Parar de dançar" : "Dançar";
+        if (playerMovementMode !== "walk") playPlayerAction(danceEnabled ? "dance" : "idle");
+      });
       waveButton.addEventListener("click", (event) => { event.stopPropagation(); playPlayerAction("wave"); onQuickMessage("Oi!"); });
       menuElement.append(danceButton, waveButton);
       playerActionMenu = new CSS3DObject(menuElement); playerActionMenu.scale.setScalar(.01); playerActionMenu.visible = false; scene.add(playerActionMenu);
@@ -430,10 +448,16 @@ export default function Arena3D({ countdown, featured, podium, playerNickname, o
         const dx = next.x - player.position.x, dz = next.z - player.position.z;
         player.position.x = next.x; player.position.z = next.z;
         if (!next.arrived) {
+          if (playerMovementMode !== "walk") playPlayerMovement?.("walk");
           player.position.y = .1 + Math.abs(Math.sin(t * 7)) * .08;
           player.rotation.y = Math.atan2(dx, dz);
         } else {
-          player.position.y = THREE.MathUtils.lerp(player.position.y, playerState.target.y, .18);
+          if (playerMovementMode !== "idle") {
+            playerMovementMode = "idle";
+            playPlayerAction(danceEnabled ? "dance" : "idle");
+          }
+          player.position.y = currentPlayerPose === "dance" ? playerState.target.y + Math.abs(Math.sin(t * 7.4)) * .16 : THREE.MathUtils.lerp(player.position.y, playerState.target.y, .18);
+          player.rotation.z = currentPlayerPose === "dance" ? Math.sin(t * 4.2) * .13 : THREE.MathUtils.lerp(player.rotation.z, 0, .22);
           if (playerState.sitting) player.rotation.y = THREE.MathUtils.lerp(player.rotation.y, playerState.targetRotation, .16);
         }
         if (playerHalo) {
