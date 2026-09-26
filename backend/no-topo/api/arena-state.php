@@ -16,6 +16,12 @@ function no_topo_arena_state(array $state, DateTimeImmutable $now): array
         'endedAt' => $entry['endedAt'] ?? null,
         'durationSeconds' => $entry['durationSeconds'] ?? null,
     ], array_slice($state['ranking'] ?? [], 0, 100));
+    $recentPurchases = array_map(static fn (array $entry): array => [
+        'nickname' => $entry['nickname'],
+        'postUrl' => $entry['postUrl'],
+        'amountCents' => $entry['amountCents'],
+        'approvedAt' => $entry['approvedAt'],
+    ], array_slice($state['purchaseHistory'] ?? [], 0, 100));
     return [
         'cycle' => $state['cycle'],
         'baseBidCents' => $state['baseBidCents'],
@@ -28,6 +34,7 @@ function no_topo_arena_state(array $state, DateTimeImmutable $now): array
         ],
         'protectedUntil' => $ranking[0]['protectedUntil'] ?? null,
         'ranking' => $ranking,
+        'recentPurchases' => $recentPurchases,
     ];
 }
 

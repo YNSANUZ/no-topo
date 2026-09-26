@@ -18,9 +18,10 @@ function timeLabel(entry: ArenaFeatured) {
   return `há ${days} ${days === 1 ? "dia" : "dias"}`;
 }
 
-function ConquestList({ entries }: { entries: ArenaFeatured[] }) {
+function ConquestList({ entries, limit }: { entries: ArenaFeatured[]; limit?: number }) {
+  const visibleEntries = limit == null ? entries : entries.slice(0, limit);
   return <ol className="conquest-list">
-    {entries.slice(0, 3).map((entry, index) => <li key={`${entry.username}-${entry.approvedAt || "inaugural"}-${index}`}>
+    {visibleEntries.map((entry, index) => <li key={`${entry.username}-${entry.approvedAt || "inaugural"}-${index}`}>
       <span className="conquest-position">{index + 1}</span>
       <span className="conquest-person"><strong>{entry.username}</strong><small>{timeLabel(entry)}</small></span>
       <b>{formatCents(entry.bid)}</b>
@@ -33,7 +34,7 @@ export default function RecentConquests({ entries }: { entries: ArenaFeatured[] 
   return <>
     <section className="conquests-card glass" aria-label="Últimas conquistas">
       <div className="conquests-title"><History size={14}/><span>ÚLTIMAS CONQUISTAS</span></div>
-      <ConquestList entries={entries}/>
+      <ConquestList entries={entries} limit={3}/>
     </section>
     <button className="conquests-mobile-trigger glass" type="button" onClick={() => setOpen(true)} aria-haspopup="dialog">
       <History size={15}/><span>Últimas conquistas</span><b>{entries.length}</b>
@@ -41,7 +42,7 @@ export default function RecentConquests({ entries }: { entries: ArenaFeatured[] 
     {open && <div className="conquests-sheet-backdrop" role="presentation" onClick={() => setOpen(false)}>
       <section className="conquests-sheet glass" role="dialog" aria-modal="true" aria-labelledby="conquests-title" onClick={(event) => event.stopPropagation()}>
         <header><div><small>HISTÓRICO PÚBLICO</small><strong id="conquests-title">Últimas conquistas</strong></div><button type="button" onClick={() => setOpen(false)} aria-label="Fechar"><X/></button></header>
-        <ConquestList entries={entries}/>
+        <div className="conquests-scroll"><ConquestList entries={entries}/></div>
         <p>Somente apelido, valor da conquista e momento são exibidos. Dados de pagamento permanecem privados.</p>
       </section>
     </div>}

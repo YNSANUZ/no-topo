@@ -32,6 +32,7 @@ function no_topo_empty_state(DateTimeImmutable $now): array
         'protectionSeconds' => NO_TOPO_PROTECTION_SECONDS,
         'reservationSeconds' => NO_TOPO_RESERVATION_SECONDS,
         'ranking' => [],
+        'purchaseHistory' => [],
         'reservations' => [],
     ];
 }
@@ -149,6 +150,12 @@ function no_topo_reserve(array $state, array $input, DateTimeImmutable $now): ar
 
 function no_topo_approve(array $state, string $reservationId, string $providerId, DateTimeImmutable $now): array
 {
+    $state['purchaseHistory'] ??= [];
+    foreach ($state['purchaseHistory'] ?? [] as $purchase) {
+        if (($purchase['reservationId'] ?? null) === $reservationId || ($purchase['providerId'] ?? null) === $providerId) {
+            return $state;
+        }
+    }
     foreach ($state['ranking'] ?? [] as $entry) {
         if (($entry['reservationId'] ?? null) === $reservationId || ($entry['providerId'] ?? null) === $providerId) {
             return $state;
@@ -201,6 +208,16 @@ function no_topo_approve(array $state, string $reservationId, string $providerId
         'protectedUntil' => no_topo_utc($protectionEndsAt),
     ];
     array_unshift($state['ranking'], $entry);
+    array_unshift($state['purchaseHistory'], [
+        'reservationId' => $reservationId,
+        'providerId' => $providerId,
+        'nickname' => $reservation['nickname'],
+        'postUrl' => $reservation['postUrl'],
+        'shortcode' => $reservation['shortcode'],
+        'amountCents' => $reservation['amountCents'],
+        'approvedAt' => no_topo_utc($now),
+    ]);
+    $state['purchaseHistory'] = array_slice($state['purchaseHistory'], 0, 500);
 
     return $state;
 }

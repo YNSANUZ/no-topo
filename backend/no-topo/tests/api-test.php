@@ -31,6 +31,19 @@ api_same(120, $public['protectionRules']['incrementSeconds'], 'public protection
 api_same(3600, $public['protectionRules']['maxSeconds'], 'public protection cap');
 api_same(null, $public['cycle']['endsAt'], 'public cycle has no daily reset');
 api_same([], $public['ranking'], 'empty public ranking');
+api_same([], $public['recentPurchases'], 'empty public purchase history');
+
+$state['purchaseHistory'] = [[
+    'reservationId' => 'private-reservation',
+    'providerId' => 'private-provider',
+    'nickname' => 'Ana',
+    'postUrl' => 'https://www.instagram.com/reel/ANA123456/',
+    'shortcode' => 'ANA123456',
+    'amountCents' => 4000,
+    'approvedAt' => '2026-09-24T15:00:00+00:00',
+]];
+$publicWithHistory = no_topo_arena_state($state, $now);
+api_same(['nickname', 'postUrl', 'amountCents', 'approvedAt'], array_keys($publicWithHistory['recentPurchases'][0]), 'public history exposes only safe fields');
 
 $created = no_topo_create_bid_session($state, [
     'nickname' => 'Visitante 482',

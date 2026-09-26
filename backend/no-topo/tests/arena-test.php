@@ -64,6 +64,8 @@ $approved = no_topo_approve($first['state'], $first['reservation']['id'], 'mp-1'
 assert_same(2000, $approved['ranking'][0]['amountCents'], 'approved bid ranks first');
 assert_same('2026-09-24T15:10:00+00:00', $approved['ranking'][0]['protectedUntil'], 'approved base bid protects ten minutes');
 assert_same(1, count(no_topo_approve($approved, $first['reservation']['id'], 'mp-1', $bidTime)['ranking']), 'approval is idempotent');
+assert_same(1, count($approved['purchaseHistory']), 'approved payment enters public history once');
+assert_same(1, count(no_topo_approve($approved, $first['reservation']['id'], 'mp-1', $bidTime)['purchaseHistory']), 'duplicate approval does not duplicate history');
 assert_throws(fn () => no_topo_reserve($approved, bid_input(4000), $bidTime->modify('+599 seconds')), 'protegido');
 assert_same(4000, no_topo_reserve($approved, bid_input(4000), $bidTime->modify('+600 seconds'))['reservation']['amountCents'], 'protection expires');
 $secondInput = bid_input(4000);
@@ -90,6 +92,8 @@ $returnApproved = no_topo_approve($returnReservation['state'], $returnReservatio
 assert_same(['Visitante 482', 'Carlos', 'Ana'], array_column(array_slice($returnApproved['ranking'], 0, 3), 'nickname'), 'returning buyer moves to first without duplicating podium entry');
 assert_same(1, count(array_filter($returnApproved['ranking'], static fn (array $entry): bool => ($entry['bidderKey'] ?? '') === hash('sha256', 'pessoa@example.com'))), 'buyer identity occupies only one podium entry');
 assert_same(1, count(array_filter($returnApproved['ranking'], static fn (array $entry): bool => ($entry['shortcode'] ?? '') === 'DV966NsjYCk')), 'same publication occupies only one podium entry');
+assert_same(4, count($returnApproved['purchaseHistory']), 'repeat buyer keeps every approved purchase in history');
+assert_same([8000, 6000, 4000, 2000], array_column($returnApproved['purchaseHistory'], 'amountCents'), 'purchase history remains newest first');
 
 $nearReset = new DateTimeImmutable('2026-09-24 23:30:00', $tz);
 $highReservation = no_topo_reserve(empty_state($nearReset), bid_input(120000), $nearReset);
