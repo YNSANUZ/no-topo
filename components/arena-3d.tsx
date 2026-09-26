@@ -268,13 +268,11 @@ export default function Arena3D({ countdown, featured, podium, playerNickname, o
     };
     const animatedPeople: Array<{ object: THREE.Object3D; baseY: number; phase: number; kind: "walking" | "seated"; roaming?: RoamingNpc }> = [];
     const mixers: THREE.AnimationMixer[] = [];
-    const playerState = { target: new THREE.Vector3(0, .1, 15.2), sitting: false, targetRotation: Math.PI };
+    const playerState = { target: new THREE.Vector3(0, .1, 15.2), sitting: false, targetRotation: Math.PI, pose: "idle", danceEnabled: false };
     let playerHalo: THREE.Mesh | null = null;
     let playerActionMenu: CSS3DObject | null = null;
     let playerMovementMode: "idle" | "walk" = "idle";
-    let playPlayerMovement: ((name: "idle" | "walk") => void) | null = null;
-    let currentPlayerPose = "idle";
-    let danceEnabled = false;
+    let playPlayerMovement: ((name: "idle" | "walk" | "dance") => void) | null = null;
     const loader = new GLTFLoader();
     Promise.all(modelPaths.map((path) => loader.loadAsync(path))).then((models) => {
       const occupied = seatPlacements.filter((_, i) => i % 2 === 0 || i % 5 === 0).slice(0, 72);
@@ -345,11 +343,11 @@ export default function Arena3D({ countdown, featured, podium, playerNickname, o
         if (name === "walk" || name === "dance") action.setLoop(THREE.LoopRepeat, Infinity);
         else if (name !== "idle") { action.setLoop(THREE.LoopRepeat, name === "wave" ? 2 : 3); action.clampWhenFinished = true; }
         action.timeScale = name === "dance" ? 1.35 : 1;
-        action.fadeIn(.12).play(); currentPlayerAction = action; currentPlayerPose = name;
+        action.fadeIn(.12).play(); currentPlayerAction = action; playerState.pose = name;
       };
-      playPlayerMovement = (name) => { playerMovementMode = name; playPlayerAction(name); };
+      playPlayerMovement = (name) => { if (name !== "dance") playerMovementMode = name; playPlayerAction(name); };
       if (idleClip) playPlayerAction("idle");
-      playerMixer.addEventListener("finished", () => playPlayerAction(danceEnabled ? "dance" : "idle"));
+      playerMixer.addEventListener("finished", () => playPlayerAction(playerState.danceEnabled ? "dance" : "idle"));
       mixers.push(playerMixer);
       playerHalo = new THREE.Mesh(new THREE.RingGeometry(.58, .78, 32), new THREE.MeshBasicMaterial({ color: LIME, transparent: true, opacity: .85, side: THREE.DoubleSide }));
       playerHalo.rotation.x = -Math.PI / 2; playerHalo.position.set(player.position.x, .08, player.position.z); scene.add(playerHalo);
@@ -360,9 +358,9 @@ export default function Arena3D({ countdown, featured, podium, playerNickname, o
       const waveButton = document.createElement("button"); waveButton.type = "button"; waveButton.textContent = "Dar oi";
       danceButton.addEventListener("click", (event) => {
         event.stopPropagation();
-        danceEnabled = !danceEnabled;
-        danceButton.textContent = danceEnabled ? "Parar de dançar" : "Dançar";
-        if (playerMovementMode !== "walk") playPlayerAction(danceEnabled ? "dance" : "idle");
+        playerState.danceEnabled = !playerState.danceEnabled;
+        danceButton.textContent = playerState.danceEnabled ? "Parar de dançar" : "Dançar";
+        if (playerMovementMode !== "walk") playPlayerAction(playerState.danceEnabled ? "dance" : "idle");
       });
       waveButton.addEventListener("click", (event) => { event.stopPropagation(); playPlayerAction("wave"); onQuickMessage("Oi!"); });
       menuElement.append(danceButton, waveButton);
@@ -454,10 +452,10 @@ export default function Arena3D({ countdown, featured, podium, playerNickname, o
         } else {
           if (playerMovementMode !== "idle") {
             playerMovementMode = "idle";
-            playPlayerAction(danceEnabled ? "dance" : "idle");
+            playPlayerMovement?.(playerState.danceEnabled ? "dance" : "idle");
           }
-          player.position.y = currentPlayerPose === "dance" ? playerState.target.y + Math.abs(Math.sin(t * 7.4)) * .16 : THREE.MathUtils.lerp(player.position.y, playerState.target.y, .18);
-          player.rotation.z = currentPlayerPose === "dance" ? Math.sin(t * 4.2) * .13 : THREE.MathUtils.lerp(player.rotation.z, 0, .22);
+          player.position.y = playerState.pose === "dance" ? playerState.target.y + Math.abs(Math.sin(t * 7.4)) * .16 : THREE.MathUtils.lerp(player.position.y, playerState.target.y, .18);
+          player.rotation.z = playerState.pose === "dance" ? Math.sin(t * 4.2) * .13 : THREE.MathUtils.lerp(player.rotation.z, 0, .22);
           if (playerState.sitting) player.rotation.y = THREE.MathUtils.lerp(player.rotation.y, playerState.targetRotation, .16);
         }
         if (playerHalo) {
