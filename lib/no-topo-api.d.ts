@@ -5,4 +5,5 @@ export function fetchArenaState(fetchImpl: typeof fetch, baseUrl?: string): Prom
 export function createBidSession(fetchImpl: typeof fetch, baseUrl: string | undefined, input: Record<string, unknown>): Promise<ApiPayload>;
 export function processBidPayment(fetchImpl: typeof fetch, baseUrl: string | undefined, reservationId: string, formData: Record<string, unknown>): Promise<ApiPayload>;
 export function fetchBidStatus(fetchImpl: typeof fetch, baseUrl: string | undefined, reservationId: string): Promise<ApiPayload>;
+export function paymentReceipt(result: ApiPayload): { paymentId: string; status: string; showStatusScreen: boolean };
 export function formatCents(cents: number): string;

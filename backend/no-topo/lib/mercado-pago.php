@@ -11,19 +11,22 @@ function no_topo_payment_payload(array $reservation, array $form): array
     $token = trim((string) ($form['token'] ?? ''));
     $method = trim((string) ($form['payment_method_id'] ?? ''));
     $email = strtolower(trim((string) ($reservation['email'] ?? '')));
-    if ($token === '' || $method === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    $requiresToken = !in_array($method, ['pix', 'bolbradesco'], true);
+    if (($requiresToken && $token === '') || $method === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         throw new InvalidArgumentException('Dados de pagamento incompletos.');
     }
     $payload = [
         'transaction_amount' => ((int) $reservation['amountCents']) / 100,
-        'token' => $token,
         'description' => 'Lance No Topo',
-        'installments' => max(1, (int) ($form['installments'] ?? 1)),
         'payment_method_id' => $method,
         'external_reference' => $reservation['id'],
         'notification_url' => 'https://primusdf.com.br/_no_topo_backend/api/mercadopago-webhook.php',
         'payer' => ['email' => $email],
     ];
+    if ($requiresToken) {
+        $payload['token'] = $token;
+        $payload['installments'] = max(1, (int) ($form['installments'] ?? 1));
+    }
     if (!empty($form['issuer_id'])) {
         $payload['issuer_id'] = (string) $form['issuer_id'];
     }

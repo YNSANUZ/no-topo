@@ -29,6 +29,16 @@ $request = [
     'reservationId' => $reservation['id'], 'reservation' => $reservation,
     'formData' => ['token' => 'tok_test', 'installments' => 1, 'payment_method_id' => 'visa'],
 ];
+
+$pixPayload = no_topo_payment_payload($reservation, [
+    'payment_method_id' => 'pix',
+    'payer' => ['identification' => ['type' => 'CPF', 'number' => '191.191.191-00']],
+]);
+pay_same('pix', $pixPayload['payment_method_id'], 'pix payment does not require a card token');
+pay_same(false, array_key_exists('token', $pixPayload), 'pix payload omits the card token');
+pay_throws(fn () => no_topo_payment_payload($reservation, [
+    'payment_method_id' => 'visa',
+]), 'incompletos');
 $gateway = static fn (array $request): array => [
     'id' => 'mp-payment-123', 'status' => 'approved',
     'external_reference' => $request['payload']['external_reference'],
