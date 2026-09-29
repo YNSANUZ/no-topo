@@ -32,7 +32,7 @@ function textTexture(lines: string[], accent = "#b9ff38") {
   return texture;
 }
 
-function rankingPosterTexture(rank: string, username: string, bid: string, duration: string, accent: string, founding = false) {
+function rankingPosterTexture(rank: string, username: string, bid: string, duration: string, accent: string) {
   const canvas = document.createElement("canvas");
   canvas.width = 600; canvas.height = 1000;
   const ctx = canvas.getContext("2d")!;
@@ -43,10 +43,10 @@ function rankingPosterTexture(rank: string, username: string, bid: string, durat
   ctx.textAlign = "center";
   ctx.fillStyle = accent; ctx.font = "900 210px Arial"; ctx.fillText(rank, 300, 260);
   ctx.fillStyle = "#ffffff"; ctx.font = "900 58px Arial"; ctx.fillText(username, 300, 390, 540);
-  ctx.fillStyle = "rgba(255,255,255,.58)"; ctx.font = "800 34px Arial"; ctx.fillText(founding ? "PERFIL FUNDADOR" : "LANCE APROVADO", 300, 610);
+  ctx.fillStyle = "rgba(255,255,255,.58)"; ctx.font = "800 34px Arial"; ctx.fillText("LANCE APROVADO", 300, 610);
   ctx.fillStyle = "#ffffff"; ctx.font = "900 72px Arial"; ctx.fillText(bid, 300, 700);
-  ctx.fillStyle = "rgba(255,255,255,.58)"; ctx.font = "800 30px Arial"; ctx.fillText(founding ? "DESTAQUE FUNDADOR" : "TEMPO NO TOPO", 300, 790);
-  ctx.fillStyle = accent; ctx.font = "900 52px Arial"; ctx.fillText(founding ? "ATÉ NOVA CONQUISTA" : duration, 300, 865);
+  ctx.fillStyle = "rgba(255,255,255,.58)"; ctx.font = "800 30px Arial"; ctx.fillText("TEMPO NO TOPO", 300, 790);
+  ctx.fillStyle = accent; ctx.font = "900 52px Arial"; ctx.fillText(duration, 300, 865);
   ctx.fillRect(190, 915, 220, 14);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -238,16 +238,16 @@ export default function Arena3D({ countdown, featured, podium, playerNickname, o
       const casing = new THREE.Mesh(new THREE.BoxGeometry(.42, .28, .5), trussMat); casing.position.set(x, 8.45, .2); scene.add(casing);
     });
 
-    const formatDuration = (seconds?: number | null) => seconds == null ? "AGUARDANDO" : seconds >= 3600 ? `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}min` : `${Math.max(1, Math.floor(seconds / 60))} min`;
+    const formatDuration = (seconds?: number | null) => seconds == null ? "SEM PROTEÇÃO" : seconds >= 3600 ? `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}min` : `${Math.max(1, Math.floor(seconds / 60))} min`;
     const rankingPosters = [podium[1] || foundingPodium[1], podium[2] || foundingPodium[2]].map((entry, index) => ({
       side: index === 0 ? -1 : 1, rank: `#${index + 2}`, username: entry.username,
-      bid: new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(entry.bid / 100), duration: formatDuration(entry.durationSeconds), accent: index === 0 ? "#b892ff" : "#ff7ce5", founding: Boolean(entry.founding),
+      bid: new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(entry.bid / 100), duration: formatDuration(entry.durationSeconds), accent: index === 0 ? "#b892ff" : "#ff7ce5",
     }));
-    rankingPosters.forEach(({ side, rank, username, bid, duration, accent, founding }) => {
+    rankingPosters.forEach(({ side, rank, username, bid, duration, accent }) => {
       const poster = new THREE.Group();
       poster.position.set(side * 7.2, 3.1, .15); poster.rotation.y = side * -.14;
       const frame = new THREE.Mesh(new THREE.BoxGeometry(3.45, 5.25, .34), new THREE.MeshStandardMaterial({ color: 0x070a12, metalness: .75, roughness: .3 }));
-      const face = new THREE.Mesh(new THREE.PlaneGeometry(3.15, 4.95), new THREE.MeshBasicMaterial({ map: rankingPosterTexture(rank, username, bid, duration, accent, founding) }));
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(3.15, 4.95), new THREE.MeshBasicMaterial({ map: rankingPosterTexture(rank, username, bid, duration, accent) }));
       face.position.z = .18; poster.add(frame, face); scene.add(poster);
     });
 

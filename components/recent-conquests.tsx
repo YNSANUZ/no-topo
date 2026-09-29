@@ -6,7 +6,6 @@ import type { ArenaFeatured } from "@/lib/live-arena.mjs";
 import { formatCents } from "@/lib/no-topo-api.mjs";
 
 function timeLabel(entry: ArenaFeatured) {
-  if (entry.founding) return entry.rank === 1 ? "Destaque inaugural" : "Destaque fundador";
   if (!entry.approvedAt) return "Conquista aprovada";
   const elapsed = Math.max(0, Date.now() - new Date(entry.approvedAt).getTime());
   const minutes = Math.floor(elapsed / 60000);
@@ -21,7 +20,7 @@ function timeLabel(entry: ArenaFeatured) {
 function ConquestList({ entries, limit }: { entries: ArenaFeatured[]; limit?: number }) {
   const visibleEntries = limit == null ? entries : entries.slice(0, limit);
   return <ol className="conquest-list">
-    {visibleEntries.map((entry, index) => <li key={`${entry.username}-${entry.approvedAt || "inaugural"}-${index}`}>
+    {visibleEntries.map((entry, index) => <li key={`${entry.username}-${entry.approvedAt || "sem-data"}-${index}`}>
       <span className="conquest-position">{index + 1}</span>
       <span className="conquest-person"><strong>{entry.username}</strong><small>{timeLabel(entry)}</small></span>
       <b>{formatCents(entry.bid)}</b>
