@@ -1,19 +1,25 @@
 "use client";
 
-import { FormEvent, useCallback, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import MercadoPagoBrick from "@/components/mercado-pago-brick";
 import { createBidSession, formatCents } from "@/lib/no-topo-api.mjs";
 import { bidAmountForMinutes, calculateBidOutcome, type ProtectionRules } from "@/lib/bid-outcome.mjs";
+import { normalizeNickname } from "@/lib/player-identity.mjs";
 
-export default function BidCheckoutDialog({ open, onOpenChange, amountCents, onAmountChange, minimumCents, nickname, defaultPostUrl, baseBidCents, incrementCents, rules, onApproved }: { open: boolean; onOpenChange: (open: boolean) => void; amountCents: number; onAmountChange: (amount: number) => void; minimumCents: number; nickname: string; defaultPostUrl: string; baseBidCents: number; incrementCents: number; rules: ProtectionRules; onApproved: () => void }) {
+export default function BidCheckoutDialog({ open, onOpenChange, amountCents, onAmountChange, minimumCents, nickname, onNicknameChange, defaultPostUrl, baseBidCents, incrementCents, rules, onApproved }: { open: boolean; onOpenChange: (open: boolean) => void; amountCents: number; onAmountChange: (amount: number) => void; minimumCents: number; nickname: string; onNicknameChange: (nickname: string) => void; defaultPostUrl: string; baseBidCents: number; incrementCents: number; rules: ProtectionRules; onApproved: () => void }) {
   const [reservation, setReservation] = useState<{ reservationId: string; amountCents: number } | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [showProtectionOptions, setShowProtectionOptions] = useState(false);
+  const [nicknameDraft, setNicknameDraft] = useState(nickname);
   const outcome = calculateBidOutcome({ amountCents, baseBidCents, incrementCents, rules });
   const chooseProtection = (minutes: number) => onAmountChange(Math.max(minimumCents, bidAmountForMinutes(minutes, { baseBidCents, incrementCents, rules })));
+
+  useEffect(() => {
+    if (open) setNicknameDraft(nickname);
+  }, [open, nickname]);
 
   const paymentStatus = useCallback((next: string) => {
     setStatus(next);
@@ -23,8 +29,16 @@ export default function BidCheckoutDialog({ open, onOpenChange, amountCents, onA
   async function reserve(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError("");
     const form = new FormData(event.currentTarget);
+    const normalized = normalizeNickname(nicknameDraft, nickname);
+    if (!normalized.allowed) {
+      setBusy(false);
+      setError(normalized.reason === "email" ? "Não use e-mail no apelido." : normalized.reason === "numbers" ? "Não use números de contato no apelido." : normalized.reason === "link" ? "Não use links no apelido." : "Escolha outro apelido.");
+      return;
+    }
     try {
-      const result = await createBidSession(fetch, undefined, { nickname, email: form.get("email"), postUrl: form.get("postUrl"), amountCents });
+      onNicknameChange(normalized.nickname);
+      window.localStorage.setItem("no-topo-player-nickname", normalized.nickname);
+      const result = await createBidSession(fetch, undefined, { nickname: normalized.nickname, email: form.get("email"), postUrl: form.get("postUrl"), amountCents });
       const reservationId = String(result.reservationId);
       sessionStorage.setItem("no-topo-reservation", reservationId);
       setReservation({ reservationId, amountCents: Number(result.amountCents) });
@@ -48,7 +62,7 @@ export default function BidCheckoutDialog({ open, onOpenChange, amountCents, onA
         </div>}
       </div>}
       {!reservation && <form className="checkout-details" onSubmit={reserve}>
-        <label className="form-field">Apelido<input value={nickname} readOnly /></label>
+        <label className="form-field">Apelido<input value={nicknameDraft} maxLength={20} autoComplete="nickname" onChange={(event) => { setNicknameDraft(event.target.value); if (error) setError(""); }} /></label>
         <label className="form-field">Link da publicação<input name="postUrl" type="url" required defaultValue={defaultPostUrl} /></label>
         <label className="form-field">E-mail<input name="email" type="email" required autoComplete="email" placeholder="voce@exemplo.com" /><small>Para recibo, suporte e identificação da compra. Não será exibido.</small></label>
         {error && <p className="checkout-error" role="alert">{error}</p>}

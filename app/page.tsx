@@ -181,7 +181,7 @@ export default function Home() {
       <button className="lime-button" disabled={remaining !== "00:00:00"} onClick={openCheckout}>{remaining !== "00:00:00" ? `PROTEGIDO POR ${remaining}` : `ASSUMIR A TELA POR ${formatCents(arenaView.nextBidCents)}`} <ArrowUpRight/></button>
     </section>
 
-    <BidCheckoutDialog open={open} onOpenChange={setOpen} amountCents={offer} onAmountChange={setOffer} minimumCents={arenaView.nextBidCents} nickname={playerNickname} defaultPostUrl={arenaView.featured.url} baseBidCents={arenaView.baseBidCents} incrementCents={arenaView.incrementCents} rules={arenaView.protectionRules} onApproved={() => { setOpen(false); void refreshArena(); }} />
+    <BidCheckoutDialog open={open} onOpenChange={setOpen} amountCents={offer} onAmountChange={setOffer} minimumCents={arenaView.nextBidCents} nickname={playerNickname} onNicknameChange={setPlayerNickname} defaultPostUrl={arenaView.featured.url} baseBidCents={arenaView.baseBidCents} incrementCents={arenaView.incrementCents} rules={arenaView.protectionRules} onApproved={() => { setOpen(false); void refreshArena(); }} />
     <BidOutcomeDialog open={outcomeOpen} onOpenChange={setOutcomeOpen} amountCents={offer} onAmountChange={setOffer} minimumCents={arenaView.nextBidCents} baseBidCents={arenaView.baseBidCents} incrementCents={arenaView.incrementCents} rules={arenaView.protectionRules} />
     <RulesDialog open={rulesOpen} onOpenChange={setRulesOpen} username={arenaView.featured.username} winningBidCents={arenaView.featured.bid} nextBidCents={arenaView.nextBidCents} incrementCents={arenaView.incrementCents} protectionActive={remaining !== "00:00:00"} />
   </main>;
